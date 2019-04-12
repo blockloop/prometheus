@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sort"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/gogo/protobuf/proto"
@@ -54,6 +55,8 @@ func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 				Value: l.GetValue(),
 			}
 		}
+		// soring guarantees hash consistency
+		sort.Sort(lbls)
 
 		var ref uint64
 		var err error
