@@ -38,6 +38,14 @@ func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ap := h.tsdb().Appender()
+
+	// rollback the appends if it is not committed successfully
+	committed := false
+	defer func() {
+		if !committed {
+			ap.Rollback()
+		}
+	}()
 	for _, ts := range timeseries {
 		lbls := make(labels.Labels, len(ts.Labels))
 		for i, l := range ts.Labels {
@@ -66,6 +74,7 @@ func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	committed = true
 }
 
 func readRequest(r *http.Request) ([]prompb.TimeSeries, error) {
