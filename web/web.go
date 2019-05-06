@@ -290,6 +290,7 @@ func New(logger log.Logger, o *Options) *Handler {
 	router.Get("/version", readyf(h.version))
 	router.Get("/service-discovery", readyf(h.serviceDiscovery))
 	router.Post("/write", readyf(h.write))
+	router.Get("/read", readyf(h.read))
 
 	router.Get("/metrics", promhttp.Handler().ServeHTTP)
 
