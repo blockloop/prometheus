@@ -43,9 +43,11 @@ func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 	ap := h.tsdb().Appender()
 
 	commit := func() {
-		err := ap.Commit()
-		if err != nil {
+		if err := ap.Commit(); err != nil {
 			level.Error(h.logger).Log("msg", "failure trying to commit write to store", "err", err)
+			if err := ap.Rollback(); err != nil {
+				level.Error(h.logger).Log("msg", "failure trying to rollback write to store", "err", err)
+			}
 		}
 	}
 	defer commit()
