@@ -87,10 +87,10 @@ func parseRequest(r *http.Request) (*prompb.Query, error) {
 	return req.GetQueries()[0], nil
 }
 
-func toPbLabels(in labels.Labels) []*prompb.Label {
-	res := make([]*prompb.Label, len(in))
+func toPbLabels(in labels.Labels) []prompb.Label {
+	res := make([]prompb.Label, len(in))
 	for i, l := range in {
-		res[i] = &prompb.Label{
+		res[i] = prompb.Label{
 			Name:  l.Name,
 			Value: l.Value,
 		}
