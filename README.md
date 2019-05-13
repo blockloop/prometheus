@@ -27,6 +27,7 @@ git rebase master
 Once you have rebased master, build it with docker
 
 ```
+CGO_ENABLED=0 go build ./cmd/prometheus
 docker build . -t digitalocean/prometheus:<latest stable tag, i.e. v2.8.1>
 docker push . -t digitalocean/prometheus:<tag>
 ```

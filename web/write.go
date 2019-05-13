@@ -26,6 +26,8 @@ import (
 	"github.com/prometheus/tsdb/labels"
 )
 
+const commitChunkSize = 500
+
 // RemoteWrite is an HTTP handler to handle Prometheus remote_write
 func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 	timeseries, err := readRequest(r)
@@ -40,14 +42,18 @@ func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 
 	ap := h.tsdb().Appender()
 
-	// rollback the appends if it is not committed successfully
-	committed := false
-	defer func() {
-		if !committed {
-			ap.Rollback()
+	commit := func() {
+		err := ap.Commit()
+		if err != nil {
+			level.Error(h.logger).Log("msg", "failure trying to commit write to store", "err", err)
 		}
-	}()
-	for _, ts := range timeseries {
+	}
+	defer commit()
+
+	for i, ts := range timeseries {
+		if i % commitChunkSize == 0 {
+			commit()
+		}
 		lbls := make(labels.Labels, len(ts.Labels))
 		for i, l := range ts.Labels {
 			lbls[i] = labels.Label{
@@ -71,13 +77,6 @@ func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	if err := ap.Commit(); err != nil {
-		level.Error(h.logger).Log("msg", "failure trying to commit write to store", "err", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	committed = true
 }
 
 func readRequest(r *http.Request) ([]prompb.TimeSeries, error) {
