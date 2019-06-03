@@ -106,10 +106,16 @@ var (
 		},
 		[]string{"handler"},
 	)
+	remoteWriteAppendFailure = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_remote_write_append_failures",
+			Help: "How many samples failed to append to tsdb from remote write requests",
+		}, []string{"reason"},
+	)
 )
 
 func init() {
-	prometheus.MustRegister(requestDuration, responseSize)
+	prometheus.MustRegister(requestDuration, responseSize, remoteWriteAppendFailure)
 }
 
 // Handler serves various HTTP endpoints of the Prometheus server
