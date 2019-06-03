@@ -75,7 +75,7 @@ func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 				err = ap.AddFast(ref, s.GetTimestamp(), s.GetValue())
 			}
 			if err != nil {
-				level.Error(h.logger).Log("msg", "failure while writing to store", "err", err)
+				remoteWriteAppendFailure.WithLabelValues(err.Error()).Inc()
 			}
 		}
 	}
