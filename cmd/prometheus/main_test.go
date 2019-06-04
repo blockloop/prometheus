@@ -27,8 +27,10 @@ import (
 
 	"github.com/prometheus/prometheus/notifier"
 	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/rules"
 	"github.com/prometheus/prometheus/util/testutil"
+	"google.golang.org/grpc"
 )
 
 var promPath string
@@ -282,5 +284,66 @@ func TestWALSegmentSizeBounds(t *testing.T) {
 		} else {
 			t.Errorf("unable to retrieve the exit status for prometheus: %v", err)
 		}
+	}
+}
+
+func TestStreamRemoteWrites(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	prom := exec.Command(promPath, "--config.file="+promConfig, "--storage.tsdb.path="+promData, "--web.enable-admin-api")
+	err := prom.Start()
+	if err != nil {
+		t.Errorf("execution error: %v", err)
+		return
+	}
+	defer prom.Process.Kill()
+
+	done := make(chan error)
+	go func() {
+		done <- prom.Wait()
+	}()
+
+	// Create grpc admin client
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, "localhost:8080", grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		t.Fatalf("failed to create grpc client connection: %v", err)
+	}
+
+	client := prompb.NewAdminClient(conn)
+
+	stream, err := client.RemoteWrite(context.Background())
+	if err != nil {
+		t.Fatalf("failed to create RemoteWrite stream: %v", err)
+	}
+	defer stream.CloseSend()
+
+	// Stream some data into prometheus
+	if err := stream.Send(&prompb.WriteRequest{
+		Timeseries: []prompb.TimeSeries{
+			{
+				Labels: []prompb.Label{
+					{
+						Name:  "__name__",
+						Value: "my_metric",
+					},
+					{
+						Name:  "test_label",
+						Value: "test_stream",
+					},
+				},
+				Samples: []prompb.Sample{
+					{
+						Value:     99.999,
+						Timestamp: time.Now().UnixNano(),
+					},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("failed to RemoteWrite data: %v", err)
 	}
 }
