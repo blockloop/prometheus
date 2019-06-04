@@ -308,7 +308,7 @@ func TestStreamRemoteWrites(t *testing.T) {
 	// Create grpc admin client
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	conn, err := grpc.DialContext(ctx, "localhost:8080", grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, "localhost:9090", grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		t.Fatalf("failed to create grpc client connection: %v", err)
 	}

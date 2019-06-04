@@ -173,7 +173,6 @@ type Options struct {
 	Flags         map[string]string
 
 	ListenAddress              string
-	GRPCAddress                string
 	CORSOrigin                 *regexp.Regexp
 	ReadTimeout                time.Duration
 	MaxConnections             int
@@ -416,19 +415,12 @@ func (h *Handler) Reload() <-chan chan error {
 // Run serves the HTTP endpoints.
 func (h *Handler) Run(ctx context.Context) error {
 	level.Info(h.logger).Log("msg", "Start listening for connections", "address", h.options.ListenAddress)
-	level.Info(h.logger).Log("msg", "Start listening for grpc connections", "address", h.options.GRPCAddress)
 
 	listener, err := net.Listen("tcp", h.options.ListenAddress)
 	if err != nil {
 		return err
 	}
 	listener = netutil.LimitListener(listener, h.options.MaxConnections)
-
-	grpcListener, err := net.Listen("tcp", h.options.GRPCAddress)
-	if err != nil {
-		return err
-	}
-	grpcListener = netutil.LimitListener(grpcListener, h.options.MaxConnections)
 
 	// Monitor incoming connections with conntrack.
 	listener = conntrack.NewListener(listener,
@@ -495,9 +487,6 @@ func (h *Handler) Run(ctx context.Context) error {
 	}()
 	go func() {
 		errCh <- m.Serve()
-	}()
-	go func() {
-		errCh <- grpcSrv.Serve(grpcListener)
 	}()
 
 	select {

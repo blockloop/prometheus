@@ -137,9 +137,6 @@ func main() {
 	a.Flag("web.listen-address", "Address to listen on for UI, API, and telemetry.").
 		Default("0.0.0.0:9090").StringVar(&cfg.web.ListenAddress)
 
-	a.Flag("grpc.listen-address", "Address to listen for grpc  admin control actions.").
-		Default("0.0.0.0:8080").StringVar(&cfg.web.GRPCAddress)
-
 	a.Flag("web.read-timeout",
 		"Maximum duration before timing out read of the request, and closing idle connections.").
 		Default("5m").SetValue(&cfg.webTimeout)
