@@ -42,6 +42,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const commitChunkSize = 500
+
 var (
 	remoteWriteAppendFailure = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -284,7 +286,7 @@ func WriteTimeSeries(timeseries []pb.TimeSeries, tsdb func() *tsdb.DB, logger lo
 	defer commit()
 
 	for i, ts := range timeseries {
-		if i%500 == 0 {
+		if i%commitChunkSize == 0 {
 			commit()
 		}
 		lbls := make(tsdbLabels.Labels, len(ts.Labels))
