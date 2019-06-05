@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
 	"github.com/stretchr/testify/require"
 )
 

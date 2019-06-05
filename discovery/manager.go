@@ -24,20 +24,20 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 
-	sd_config "github.com/prometheus/prometheus/v3/discovery/config"
-	"github.com/prometheus/prometheus/v3/discovery/targetgroup"
+	sd_config "github.com/digitalocean/prometheus/v3/discovery/config"
+	"github.com/digitalocean/prometheus/v3/discovery/targetgroup"
 
-	"github.com/prometheus/prometheus/v3/discovery/azure"
-	"github.com/prometheus/prometheus/v3/discovery/consul"
-	"github.com/prometheus/prometheus/v3/discovery/dns"
-	"github.com/prometheus/prometheus/v3/discovery/ec2"
-	"github.com/prometheus/prometheus/v3/discovery/file"
-	"github.com/prometheus/prometheus/v3/discovery/gce"
-	"github.com/prometheus/prometheus/v3/discovery/kubernetes"
-	"github.com/prometheus/prometheus/v3/discovery/marathon"
-	"github.com/prometheus/prometheus/v3/discovery/openstack"
-	"github.com/prometheus/prometheus/v3/discovery/triton"
-	"github.com/prometheus/prometheus/v3/discovery/zookeeper"
+	"github.com/digitalocean/prometheus/v3/discovery/azure"
+	"github.com/digitalocean/prometheus/v3/discovery/consul"
+	"github.com/digitalocean/prometheus/v3/discovery/dns"
+	"github.com/digitalocean/prometheus/v3/discovery/ec2"
+	"github.com/digitalocean/prometheus/v3/discovery/file"
+	"github.com/digitalocean/prometheus/v3/discovery/gce"
+	"github.com/digitalocean/prometheus/v3/discovery/kubernetes"
+	"github.com/digitalocean/prometheus/v3/discovery/marathon"
+	"github.com/digitalocean/prometheus/v3/discovery/openstack"
+	"github.com/digitalocean/prometheus/v3/discovery/triton"
+	"github.com/digitalocean/prometheus/v3/discovery/zookeeper"
 )
 
 var (

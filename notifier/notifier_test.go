@@ -25,16 +25,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/v3/pkg/relabel"
+	"github.com/digitalocean/prometheus/v3/pkg/relabel"
 
 	yaml "gopkg.in/yaml.v2"
 
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/config"
-	"github.com/prometheus/prometheus/v3/discovery/targetgroup"
-	"github.com/prometheus/prometheus/v3/pkg/labels"
-	"github.com/prometheus/prometheus/v3/util/testutil"
+	"github.com/digitalocean/prometheus/v3/config"
+	"github.com/digitalocean/prometheus/v3/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/util/testutil"
 )
 
 func TestPostPath(t *testing.T) {

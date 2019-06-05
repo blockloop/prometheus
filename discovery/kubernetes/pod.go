@@ -28,8 +28,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"github.com/prometheus/prometheus/v3/discovery/targetgroup"
-	"github.com/prometheus/prometheus/v3/util/strutil"
+	"github.com/digitalocean/prometheus/v3/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v3/util/strutil"
 )
 
 // Pod discovers new pod targets.

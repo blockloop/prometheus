@@ -21,9 +21,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/pkg/timestamp"
-	"github.com/prometheus/prometheus/v3/promql"
-	"github.com/prometheus/prometheus/v3/template"
+	"github.com/digitalocean/prometheus/v3/pkg/timestamp"
+	"github.com/digitalocean/prometheus/v3/promql"
+	"github.com/digitalocean/prometheus/v3/template"
 	"gopkg.in/yaml.v2"
 )
 

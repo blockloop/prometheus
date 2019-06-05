@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/config"
-	"github.com/prometheus/prometheus/v3/promql"
+	"github.com/digitalocean/prometheus/v3/config"
+	"github.com/digitalocean/prometheus/v3/promql"
 )
 
 var scenarios = map[string]struct {

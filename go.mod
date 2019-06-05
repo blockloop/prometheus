@@ -1,4 +1,4 @@
-module github.com/prometheus/prometheus/v3
+module github.com/digitalocean/prometheus/v3
 
 require (
 	contrib.go.opencensus.io/exporter/ocagent v0.4.1 // indirect

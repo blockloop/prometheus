@@ -16,7 +16,7 @@ package textparse
 import (
 	"mime"
 
-	"github.com/prometheus/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
 )
 
 // Parser parses samples from a byte slice of samples in the official

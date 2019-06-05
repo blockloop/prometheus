@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/storage"
-	"github.com/prometheus/prometheus/v3/storage/tsdb"
+	"github.com/digitalocean/prometheus/v3/storage"
+	"github.com/digitalocean/prometheus/v3/storage/tsdb"
 )
 
 // NewStorage returns a new storage for testing purposes

@@ -18,7 +18,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/prometheus/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
 	"github.com/stretchr/testify/require"
 )
 

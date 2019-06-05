@@ -20,8 +20,8 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
-	"github.com/prometheus/prometheus/v3/prompb"
-	"github.com/prometheus/prometheus/v3/web/api/v2"
+	"github.com/digitalocean/prometheus/v3/prompb"
+	"github.com/digitalocean/prometheus/v3/web/api/v2"
 )
 
 const commitChunkSize = 500

@@ -24,9 +24,9 @@ import (
 	"github.com/golang/snappy"
 	"github.com/prometheus/common/model"
 
-	"github.com/prometheus/prometheus/v3/pkg/labels"
-	"github.com/prometheus/prometheus/v3/prompb"
-	"github.com/prometheus/prometheus/v3/storage"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/prompb"
+	"github.com/digitalocean/prometheus/v3/storage"
 )
 
 // decodeReadLimit is the maximum size of a read request body in bytes.

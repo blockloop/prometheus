@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/prometheus/prometheus/v3/discovery/targetgroup"
-	"github.com/prometheus/prometheus/v3/util/testutil"
+	"github.com/digitalocean/prometheus/v3/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v3/util/testutil"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"

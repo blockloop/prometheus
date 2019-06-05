@@ -29,7 +29,7 @@ import (
 	"github.com/prometheus/common/version"
 
 	config_util "github.com/prometheus/common/config"
-	"github.com/prometheus/prometheus/v3/prompb"
+	"github.com/digitalocean/prometheus/v3/prompb"
 )
 
 const maxErrMsgLen = 256

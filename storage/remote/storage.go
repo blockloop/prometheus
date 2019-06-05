@@ -22,10 +22,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/config"
-	"github.com/prometheus/prometheus/v3/pkg/labels"
-	"github.com/prometheus/prometheus/v3/pkg/logging"
-	"github.com/prometheus/prometheus/v3/storage"
+	"github.com/digitalocean/prometheus/v3/config"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/pkg/logging"
+	"github.com/digitalocean/prometheus/v3/storage"
 )
 
 // startTimeCallback is a callback func that return the oldest timestamp stored in a storage.

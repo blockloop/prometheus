@@ -26,9 +26,9 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/config"
-	sd_config "github.com/prometheus/prometheus/v3/discovery/config"
-	"github.com/prometheus/prometheus/v3/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v3/config"
+	sd_config "github.com/digitalocean/prometheus/v3/discovery/config"
+	"github.com/digitalocean/prometheus/v3/discovery/targetgroup"
 	"gopkg.in/yaml.v2"
 )
 

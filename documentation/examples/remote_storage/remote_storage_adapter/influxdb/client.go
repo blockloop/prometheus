@@ -24,7 +24,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/prompb"
+	"github.com/digitalocean/prometheus/v3/prompb"
 
 	influx "github.com/influxdata/influxdb/client/v2"
 )

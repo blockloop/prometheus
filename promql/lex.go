@@ -893,7 +893,7 @@ func isAlphaNumeric(r rune) bool {
 
 // isDigit reports whether r is a digit. Note: we cannot use unicode.IsDigit()
 // instead because that also classifies non-Latin digits as digits. See
-// https://github.com/prometheus/prometheus/v3/issues/939.
+// https://github.com/digitalocean/prometheus/v3/issues/939.
 func isDigit(r rune) bool {
 	return '0' <= r && r <= '9'
 }

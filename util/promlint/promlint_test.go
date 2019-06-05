@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prometheus/prometheus/v3/util/promlint"
+	"github.com/digitalocean/prometheus/v3/util/promlint"
 )
 
 func TestLintNoHelpText(t *testing.T) {

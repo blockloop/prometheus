@@ -22,9 +22,9 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
-	"github.com/prometheus/prometheus/v3/config"
-	"github.com/prometheus/prometheus/v3/discovery/targetgroup"
-	"github.com/prometheus/prometheus/v3/storage"
+	"github.com/digitalocean/prometheus/v3/config"
+	"github.com/digitalocean/prometheus/v3/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v3/storage"
 )
 
 // Appendable returns an Appender.

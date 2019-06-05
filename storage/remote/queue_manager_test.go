@@ -33,9 +33,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/config"
-	"github.com/prometheus/prometheus/v3/prompb"
-	"github.com/prometheus/prometheus/v3/util/testutil"
+	"github.com/digitalocean/prometheus/v3/config"
+	"github.com/digitalocean/prometheus/v3/prompb"
+	"github.com/digitalocean/prometheus/v3/util/testutil"
 	"github.com/prometheus/tsdb"
 	"github.com/prometheus/tsdb/labels"
 )

@@ -27,9 +27,9 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/discovery/targetgroup"
-	"github.com/prometheus/prometheus/v3/documentation/examples/custom-sd/adapter"
-	"github.com/prometheus/prometheus/v3/util/strutil"
+	"github.com/digitalocean/prometheus/v3/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v3/documentation/examples/custom-sd/adapter"
+	"github.com/digitalocean/prometheus/v3/util/strutil"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 

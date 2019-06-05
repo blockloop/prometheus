@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/v3/pkg/labels"
-	"github.com/prometheus/prometheus/v3/pkg/timestamp"
-	"github.com/prometheus/prometheus/v3/promql"
-	"github.com/prometheus/prometheus/v3/util/testutil"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/pkg/timestamp"
+	"github.com/digitalocean/prometheus/v3/promql"
+	"github.com/digitalocean/prometheus/v3/util/testutil"
 )
 
 func TestAlertingRuleHTMLSnippet(t *testing.T) {

@@ -31,12 +31,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/v3/pkg/labels"
-	"github.com/prometheus/prometheus/v3/pkg/rulefmt"
-	"github.com/prometheus/prometheus/v3/pkg/timestamp"
-	"github.com/prometheus/prometheus/v3/pkg/value"
-	"github.com/prometheus/prometheus/v3/promql"
-	"github.com/prometheus/prometheus/v3/storage"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/pkg/rulefmt"
+	"github.com/digitalocean/prometheus/v3/pkg/timestamp"
+	"github.com/digitalocean/prometheus/v3/pkg/value"
+	"github.com/digitalocean/prometheus/v3/promql"
+	"github.com/digitalocean/prometheus/v3/storage"
 )
 
 // RuleHealth describes the health state of a target.

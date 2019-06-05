@@ -23,7 +23,7 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	"github.com/prometheus/prometheus/v3/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v3/discovery/targetgroup"
 )
 
 const testDir = "fixtures"

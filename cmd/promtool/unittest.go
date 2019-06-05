@@ -26,10 +26,10 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/prometheus/prometheus/v3/pkg/labels"
-	"github.com/prometheus/prometheus/v3/promql"
-	"github.com/prometheus/prometheus/v3/rules"
-	"github.com/prometheus/prometheus/v3/storage"
+	"github.com/digitalocean/prometheus/v3/pkg/labels"
+	"github.com/digitalocean/prometheus/v3/promql"
+	"github.com/digitalocean/prometheus/v3/rules"
+	"github.com/digitalocean/prometheus/v3/storage"
 )
 
 // RulesUnitTest does unit testing of rules based on the unit testing files provided.
