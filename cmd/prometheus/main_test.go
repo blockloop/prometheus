@@ -17,6 +17,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -300,11 +301,6 @@ func TestStreamRemoteWrites(t *testing.T) {
 	}
 	defer prom.Process.Kill()
 
-	done := make(chan error)
-	go func() {
-		done <- prom.Wait()
-	}()
-
 	// Create grpc admin client
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -337,8 +333,8 @@ func TestStreamRemoteWrites(t *testing.T) {
 				},
 				Samples: []prompb.Sample{
 					{
-						Value:     99.999,
-						Timestamp: time.Now().UnixNano(),
+						Value:     100 * rand.Float64(),
+						Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
 					},
 				},
 			},
