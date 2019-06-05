@@ -34,11 +34,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
-
-	"google.golang.org/grpc"
-
 	template_text "text/template"
+	"time"
 
 	"github.com/cockroachdb/cmux"
 	"github.com/go-kit/kit/log"
@@ -51,21 +48,21 @@ import (
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/route"
-	prometheus_tsdb "github.com/prometheus/prometheus/storage/tsdb"
-	"github.com/prometheus/tsdb"
-	"golang.org/x/net/netutil"
-
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/notifier"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/rules"
 	"github.com/prometheus/prometheus/scrape"
 	"github.com/prometheus/prometheus/storage"
+	prometheus_tsdb "github.com/prometheus/prometheus/storage/tsdb"
 	"github.com/prometheus/prometheus/template"
 	"github.com/prometheus/prometheus/util/httputil"
 	api_v1 "github.com/prometheus/prometheus/web/api/v1"
 	api_v2 "github.com/prometheus/prometheus/web/api/v2"
 	"github.com/prometheus/prometheus/web/ui"
+	"github.com/prometheus/tsdb"
+	"golang.org/x/net/netutil"
+	"google.golang.org/grpc"
 )
 
 var localhostRepresentations = []string{"127.0.0.1", "localhost"}
@@ -106,16 +103,10 @@ var (
 		},
 		[]string{"handler"},
 	)
-	remoteWriteAppendFailure = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "prometheus_remote_write_append_failures",
-			Help: "How many samples failed to append to tsdb from remote write requests",
-		}, []string{"reason"},
-	)
 )
 
 func init() {
-	prometheus.MustRegister(requestDuration, responseSize, remoteWriteAppendFailure)
+	prometheus.MustRegister(requestDuration, responseSize)
 }
 
 // Handler serves various HTTP endpoints of the Prometheus server
@@ -445,6 +436,7 @@ func (h *Handler) Run(ctx context.Context) error {
 	av2 := api_v2.New(
 		h.options.TSDB,
 		h.options.EnableAdminAPI,
+		h.logger,
 	)
 	av2.RegisterGRPC(grpcSrv)
 

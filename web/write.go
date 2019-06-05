@@ -17,13 +17,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sort"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
-	"github.com/prometheus/tsdb/labels"
+	"github.com/prometheus/prometheus/web/api/v2"
 )
 
 const commitChunkSize = 500
@@ -40,45 +38,7 @@ func (h *Handler) write(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ap := h.tsdb().Appender()
-
-	commit := func() {
-		if err := ap.Commit(); err != nil {
-			level.Error(h.logger).Log("msg", "failure trying to commit write to store", "err", err)
-			if err := ap.Rollback(); err != nil {
-				level.Error(h.logger).Log("msg", "failure trying to rollback write to store", "err", err)
-			}
-		}
-	}
-	defer commit()
-
-	for i, ts := range timeseries {
-		if i % commitChunkSize == 0 {
-			commit()
-		}
-		lbls := make(labels.Labels, len(ts.Labels))
-		for i, l := range ts.Labels {
-			lbls[i] = labels.Label{
-				Name:  l.GetName(),
-				Value: l.GetValue(),
-			}
-		}
-		// soring guarantees hash consistency
-		sort.Sort(lbls)
-
-		var ref uint64
-		var err error
-		for _, s := range ts.Samples {
-			if ref == 0 {
-				ref, err = ap.Add(lbls, s.GetTimestamp(), s.GetValue())
-			} else {
-				err = ap.AddFast(ref, s.GetTimestamp(), s.GetValue())
-			}
-			if err != nil {
-				remoteWriteAppendFailure.WithLabelValues(err.Error()).Inc()
-			}
-		}
-	}
+	api_v2.WriteTimeSeries(timeseries, h.tsdb, h.logger)
 }
 
 func readRequest(r *http.Request) ([]prompb.TimeSeries, error) {
