@@ -26,8 +26,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/pkg/value"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/pkg/value"
 )
 
 type openMetricsLexer struct {

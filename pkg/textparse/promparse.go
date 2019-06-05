@@ -27,8 +27,8 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/pkg/value"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/pkg/value"
 )
 
 type promlexer struct {

@@ -18,8 +18,8 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/util/testutil"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/util/testutil"
 )
 
 func TestRelabel(t *testing.T) {

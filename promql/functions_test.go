@@ -18,13 +18,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/pkg/timestamp"
-	"github.com/prometheus/prometheus/util/testutil"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/pkg/timestamp"
+	"github.com/digitalocean/prometheus/v2/util/testutil"
 )
 
 func TestDeriv(t *testing.T) {
-	// https://github.com/prometheus/prometheus/issues/2674#issuecomment-315439393
+	// https://github.com/digitalocean/prometheus/v2/issues/2674#issuecomment-315439393
 	// This requires more precision than the usual test system offers,
 	// so we test it by hand.
 	storage := testutil.NewStorage(t)

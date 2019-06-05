@@ -17,7 +17,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
 )
 
 // Helpers to calculate quantiles.

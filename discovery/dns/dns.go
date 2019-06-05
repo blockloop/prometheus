@@ -26,7 +26,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v2/discovery/targetgroup"
 )
 
 const (

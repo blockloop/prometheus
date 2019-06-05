@@ -25,12 +25,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/config"
-	"github.com/prometheus/prometheus/notifier"
-	"github.com/prometheus/prometheus/rules"
-	"github.com/prometheus/prometheus/scrape"
-	"github.com/prometheus/prometheus/storage/tsdb"
-	"github.com/prometheus/prometheus/util/testutil"
+	"github.com/digitalocean/prometheus/v2/config"
+	"github.com/digitalocean/prometheus/v2/notifier"
+	"github.com/digitalocean/prometheus/v2/rules"
+	"github.com/digitalocean/prometheus/v2/scrape"
+	"github.com/digitalocean/prometheus/v2/storage/tsdb"
+	"github.com/digitalocean/prometheus/v2/util/testutil"
 	libtsdb "github.com/prometheus/tsdb"
 )
 

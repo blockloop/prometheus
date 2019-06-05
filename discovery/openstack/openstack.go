@@ -27,7 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/discovery/targetgroup"
+	"github.com/digitalocean/prometheus/v2/discovery/targetgroup"
 )
 
 var (

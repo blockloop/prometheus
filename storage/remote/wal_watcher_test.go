@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/util/testutil"
+	"github.com/digitalocean/prometheus/v2/util/testutil"
 	"github.com/prometheus/tsdb"
 	"github.com/prometheus/tsdb/labels"
 	"github.com/prometheus/tsdb/wal"

@@ -21,7 +21,7 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
 )
 
 var (

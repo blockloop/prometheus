@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/prometheus/pkg/relabel"
+	"github.com/digitalocean/prometheus/v2/pkg/relabel"
 
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	sd_config "github.com/prometheus/prometheus/discovery/config"
+	sd_config "github.com/digitalocean/prometheus/v2/discovery/config"
 	"gopkg.in/yaml.v2"
 )
 

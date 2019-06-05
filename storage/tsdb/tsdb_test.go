@@ -18,9 +18,9 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/storage/tsdb"
-	"github.com/prometheus/prometheus/util/testutil"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/storage/tsdb"
+	"github.com/digitalocean/prometheus/v2/util/testutil"
 )
 
 func TestMetrics(t *testing.T) {

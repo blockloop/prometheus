@@ -29,7 +29,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/prometheus/pkg/timestamp"
+	"github.com/digitalocean/prometheus/v2/pkg/timestamp"
 	"github.com/prometheus/tsdb"
 	"github.com/prometheus/tsdb/fileutil"
 	"github.com/prometheus/tsdb/wal"

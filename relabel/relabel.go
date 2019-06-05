@@ -20,14 +20,14 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	pkgrelabel "github.com/prometheus/prometheus/pkg/relabel"
+	pkgrelabel "github.com/digitalocean/prometheus/v2/pkg/relabel"
 )
 
 // Process returns a relabeled copy of the given label set. The relabel configurations
 // are applied in order of input.
 // If a label set is dropped, nil is returned.
 // May return the input labelSet modified.
-// TODO(https://github.com/prometheus/prometheus/issues/3647): Get rid of this package in favor of pkg/relabel
+// TODO(https://github.com/digitalocean/prometheus/v2/issues/3647): Get rid of this package in favor of pkg/relabel
 //  once usage of `model.LabelSet` is removed.
 func Process(labels model.LabelSet, cfgs ...*pkgrelabel.Config) model.LabelSet {
 	for _, cfg := range cfgs {

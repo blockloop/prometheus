@@ -16,7 +16,7 @@
 
 package promql
 
-import "github.com/prometheus/prometheus/pkg/textparse"
+import "github.com/digitalocean/prometheus/v2/pkg/textparse"
 
 // PromQL parser fuzzing instrumentation for use with
 // https://github.com/dvyukov/go-fuzz.
@@ -24,7 +24,7 @@ import "github.com/prometheus/prometheus/pkg/textparse"
 // Fuzz each parser by building appropriately instrumented parser, ex.
 // FuzzParseMetric and execute it with it's
 //
-//     go-fuzz-build -func FuzzParseMetric -o FuzzParseMetric.zip github.com/prometheus/prometheus/promql
+//     go-fuzz-build -func FuzzParseMetric -o FuzzParseMetric.zip github.com/digitalocean/prometheus/v2/promql
 //
 // And then run the tests with the appropriate inputs
 //

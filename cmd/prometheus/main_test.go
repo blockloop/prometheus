@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/notifier"
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/prompb"
-	"github.com/prometheus/prometheus/rules"
-	"github.com/prometheus/prometheus/util/testutil"
+	"github.com/digitalocean/prometheus/v2/notifier"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/prompb"
+	"github.com/digitalocean/prometheus/v2/rules"
+	"github.com/digitalocean/prometheus/v2/util/testutil"
 	"google.golang.org/grpc"
 )
 

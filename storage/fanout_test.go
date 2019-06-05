@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/digitalocean/prometheus/v2/pkg/labels"
 )
 
 func TestMergeStringSlices(t *testing.T) {
