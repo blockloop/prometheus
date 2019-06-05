@@ -29,10 +29,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/config"
-	pkgrelabel "github.com/prometheus/prometheus/pkg/relabel"
-	"github.com/prometheus/prometheus/prompb"
-	"github.com/prometheus/prometheus/relabel"
+	"github.com/prometheus/prometheus/v3/config"
+	pkgrelabel "github.com/prometheus/prometheus/v3/pkg/relabel"
+	"github.com/prometheus/prometheus/v3/prompb"
+	"github.com/prometheus/prometheus/v3/relabel"
 	"github.com/prometheus/tsdb"
 )
 

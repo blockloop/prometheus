@@ -31,13 +31,13 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/pkg/gate"
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/pkg/timestamp"
-	"github.com/prometheus/prometheus/pkg/value"
-	"github.com/prometheus/prometheus/storage"
+	"github.com/prometheus/prometheus/v3/pkg/gate"
+	"github.com/prometheus/prometheus/v3/pkg/labels"
+	"github.com/prometheus/prometheus/v3/pkg/timestamp"
+	"github.com/prometheus/prometheus/v3/pkg/value"
+	"github.com/prometheus/prometheus/v3/storage"
 
-	"github.com/prometheus/prometheus/util/stats"
+	"github.com/prometheus/prometheus/v3/util/stats"
 )
 
 const (

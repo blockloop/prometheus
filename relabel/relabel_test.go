@@ -18,8 +18,8 @@ import (
 
 	"github.com/prometheus/common/model"
 
-	pkgrelabel "github.com/prometheus/prometheus/pkg/relabel"
-	"github.com/prometheus/prometheus/util/testutil"
+	pkgrelabel "github.com/prometheus/prometheus/v3/pkg/relabel"
+	"github.com/prometheus/prometheus/v3/util/testutil"
 )
 
 func TestRelabel(t *testing.T) {
