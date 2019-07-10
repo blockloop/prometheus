@@ -45,16 +45,28 @@ import (
 const commitChunkSize = 500
 
 var (
-	remoteWriteAppendFailure = prometheus.NewCounterVec(
+	remoteWriteRollback = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "prometheus_remote_write_append_failures",
-			Help: "How many samples failed to append to tsdb from remote write requests",
+			Name: "prometheus_remote_write_rollback",
+			Help: "TSDB rollbacks during remote write",
+		}, []string{"reason"},
+	)
+	remoteWriteRollbackFailure = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_remote_write_rollback_failure",
+			Help: "TSDB remote write appender rollback failures",
+		}, []string{"reason"},
+	)
+	remoteWriteCommitFailure = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_remote_write_commit_failure",
+			Help: "TSDB remote write appender commit failures",
 		}, []string{"reason"},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(remoteWriteAppendFailure)
+	prometheus.MustRegister(remoteWriteRollback)
 }
 
 // API encapsulates all API services.
@@ -277,10 +289,13 @@ func WriteTimeSeries(timeseries []pb.TimeSeries, tsdb func() *tsdb.DB, logger lo
 
 	commit := func() {
 		if err := ap.Commit(); err != nil {
-			level.Error(logger).Log("msg", "failure trying to commit write to store", "err", err)
-			if err := ap.Rollback(); err != nil {
-				level.Error(logger).Log("msg", "failure trying to rollback write to store", "err", err)
-			}
+			remoteWriteCommitFailure.WithLabelValues(err.Error()).Inc()
+		}
+		ap = tsdb().Appender()
+	}
+	rollback := func() {
+		if err := ap.Rollback(); err != nil {
+			remoteWriteRollbackFailure.WithLabelValues(err.Error()).Inc()
 		}
 		ap = tsdb().Appender()
 	}
@@ -297,7 +312,7 @@ func WriteTimeSeries(timeseries []pb.TimeSeries, tsdb func() *tsdb.DB, logger lo
 				Value: l.GetValue(),
 			}
 		}
-		// soring guarantees hash consistency
+		// sorting guarantees hash consistency
 		sort.Sort(lbls)
 
 		var ref uint64
@@ -309,7 +324,9 @@ func WriteTimeSeries(timeseries []pb.TimeSeries, tsdb func() *tsdb.DB, logger lo
 				err = ap.AddFast(ref, s.GetTimestamp(), s.GetValue())
 			}
 			if err != nil {
-				remoteWriteAppendFailure.WithLabelValues(err.Error()).Inc()
+				rollback()
+				remoteWriteRollback.WithLabelValues(err.Error()).Inc()
+				break
 			}
 		}
 	}
