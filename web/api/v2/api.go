@@ -287,27 +287,10 @@ func (s *Admin) RemoteWrite(stream pb.Admin_RemoteWriteServer) error {
 func WriteTimeSeries(timeseries []pb.TimeSeries, tsdb func() *tsdb.DB, logger log.Logger) {
 	ap := tsdb().Appender()
 
-	commit := func() {
-		if err := ap.Commit(); err != nil {
-			remoteWriteCommitFailure.WithLabelValues(err.Error()).Inc()
-		}
-		ap = tsdb().Appender()
-	}
-	rollback := func() {
-		if err := ap.Rollback(); err != nil {
-			remoteWriteRollbackFailure.WithLabelValues(err.Error()).Inc()
-		}
-		ap = tsdb().Appender()
-	}
-	defer commit()
-
-	for i, ts := range timeseries {
-		if i%commitChunkSize == 0 {
-			commit()
-		}
+	for _, ts := range timeseries {
 		lbls := make(tsdbLabels.Labels, len(ts.Labels))
-		for i, l := range ts.Labels {
-			lbls[i] = tsdbLabels.Label{
+		for j, l := range ts.Labels {
+			lbls[j] = tsdbLabels.Label{
 				Name:  l.GetName(),
 				Value: l.GetValue(),
 			}
@@ -324,10 +307,16 @@ func WriteTimeSeries(timeseries []pb.TimeSeries, tsdb func() *tsdb.DB, logger lo
 				err = ap.AddFast(ref, s.GetTimestamp(), s.GetValue())
 			}
 			if err != nil {
-				rollback()
 				remoteWriteRollback.WithLabelValues(err.Error()).Inc()
-				break
+				if err := ap.Rollback(); err != nil {
+					remoteWriteRollbackFailure.WithLabelValues(err.Error()).Inc()
+				}
+				return
 			}
 		}
+	}
+
+	if err := ap.Commit(); err != nil {
+		remoteWriteCommitFailure.WithLabelValues(err.Error()).Inc()
 	}
 }
