@@ -282,6 +282,7 @@ func WriteTimeSeries(timeseries []pb.TimeSeries, tsdb func() *tsdb.DB, logger lo
 				level.Error(logger).Log("msg", "failure trying to rollback write to store", "err", err)
 			}
 		}
+		ap = tsdb().Appender()
 	}
 	defer commit()
 
