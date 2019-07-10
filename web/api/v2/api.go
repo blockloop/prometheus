@@ -285,7 +285,16 @@ func (s *Admin) RemoteWrite(stream pb.Admin_RemoteWriteServer) error {
 
 // WriteTimeSeries writes a set of timeseries metrics to the tsdb
 func WriteTimeSeries(timeseries []pb.TimeSeries, tsdb func() *tsdb.DB, logger log.Logger) {
-	ap := tsdb().Appender()
+	db := tsdb()
+	if db == nil {
+		level.Error(logger).Log("msg", "nil tsdb")
+		return
+	}
+	ap := db.Appender()
+	if ap == nil {
+		level.Error(logger).Log("msg", "nil appender")
+		return
+	}
 
 	for _, ts := range timeseries {
 		lbls := make(tsdbLabels.Labels, len(ts.Labels))
