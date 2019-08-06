@@ -173,6 +173,7 @@ type Options struct {
 	Flags         map[string]string
 
 	ListenAddress              string
+	GRPCListenAddress          string
 	CORSOrigin                 *regexp.Regexp
 	ReadTimeout                time.Duration
 	MaxConnections             int
@@ -416,23 +417,39 @@ func (h *Handler) Reload() <-chan chan error {
 func (h *Handler) Run(ctx context.Context) error {
 	level.Info(h.logger).Log("msg", "Start listening for connections", "address", h.options.ListenAddress)
 
-	listener, err := net.Listen("tcp", h.options.ListenAddress)
+	webListener, err := net.Listen("tcp", h.options.ListenAddress)
 	if err != nil {
 		return err
 	}
-	listener = netutil.LimitListener(listener, h.options.MaxConnections)
+	webListener = netutil.LimitListener(webListener, h.options.MaxConnections)
 
 	// Monitor incoming connections with conntrack.
-	listener = conntrack.NewListener(listener,
+	webListener = conntrack.NewListener(webListener,
 		conntrack.TrackWithName("http"),
 		conntrack.TrackWithTracing())
 
 	var (
-		m       = cmux.New(listener)
+		m       = cmux.New(webListener)
 		grpcl   = m.Match(cmux.HTTP2HeaderField("content-type", "application/grpc"))
 		httpl   = m.Match(cmux.HTTP1Fast())
 		grpcSrv = grpc.NewServer()
 	)
+
+	if h.options.GRPCListenAddress != h.options.ListenAddress {
+		grpcListener, err := net.Listen("tcp", h.options.GRPCListenAddress)
+		if err != nil {
+			return err
+		}
+		grpcListener = netutil.LimitListener(grpcListener, h.options.MaxConnections)
+
+		// Monitor incoming connections with conntrack.
+		grpcListener = conntrack.NewListener(grpcListener,
+			conntrack.TrackWithName("http"),
+			conntrack.TrackWithTracing())
+		grpcm := cmux.New(grpcListener)
+		grpcl = grpcm.Match(cmux.HTTP2HeaderField("content-type", "application/grpc"))
+	}
+
 	av2 := api_v2.New(
 		h.options.TSDB,
 		h.options.EnableAdminAPI,
