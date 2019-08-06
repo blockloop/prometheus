@@ -25,7 +25,7 @@ require (
 	github.com/elazarl/go-bindata-assetfs v1.0.0 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible // indirect
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
-	github.com/fsnotify/fsnotify v1.4.7 // indirect
+	github.com/fsnotify/fsnotify v1.4.7
 	github.com/getsentry/raven-go v0.1.0 // indirect
 	github.com/go-ini/ini v1.21.1 // indirect
 	github.com/go-kit/kit v0.8.0
