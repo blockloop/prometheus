@@ -33,6 +33,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/oklog/pkg/group"
@@ -713,6 +714,36 @@ func main() {
 			},
 		)
 	}
+
+	// Watch the config file for changes
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		level.Error(logger).Log("failed to create watcher", "err", err)
+		os.Exit(1)
+	}
+
+	go func() {
+		for {
+			select {
+			case <-watcher.Events: // reload on all events
+				if err := reloadConfig(cfg.configFile, logger, reloaders...); err != nil {
+					level.Error(logger).Log("failed to reload config", "err", err)
+					os.Exit(1)
+				}
+
+			case err := <-watcher.Errors:
+				level.Error(logger).Log("file watch error", "err", err)
+				os.Exit(1)
+			}
+		}
+	}()
+
+	err = watcher.Add(cfg.configFile)
+	if err != nil {
+		level.Error(logger).Log("failed to add config file to watcher", "err", err)
+		os.Exit(1)
+	}
+
 	if err := g.Run(); err != nil {
 		level.Error(logger).Log("err", err)
 		os.Exit(1)
