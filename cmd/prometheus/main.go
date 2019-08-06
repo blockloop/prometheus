@@ -137,7 +137,7 @@ func main() {
 	a.Flag("config.file", "Prometheus configuration file path.").
 		Default("prometheus.yml").StringVar(&cfg.configFile)
 
-	a.Flag("autoreload.config", "Automatically reload config file on changes").
+	a.Flag("config.autoreload", "Automatically reload config file on changes").
 		Default("false").BoolVar(&cfg.autoReload)
 
 	a.Flag("web.listen-address", "Address to listen on for UI, API, and telemetry.").
