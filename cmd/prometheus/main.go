@@ -100,6 +100,7 @@ func main() {
 
 	cfg := struct {
 		configFile string
+		autoReload bool
 
 		localStoragePath    string
 		notifier            notifier.Options
@@ -135,6 +136,9 @@ func main() {
 
 	a.Flag("config.file", "Prometheus configuration file path.").
 		Default("prometheus.yml").StringVar(&cfg.configFile)
+
+	a.Flag("autoreload.config", "Automatically reload config file on changes").
+		Default("false").BoolVar(&cfg.autoReload)
 
 	a.Flag("web.listen-address", "Address to listen on for UI, API, and telemetry.").
 		Default("0.0.0.0:9090").StringVar(&cfg.web.ListenAddress)
@@ -716,32 +720,34 @@ func main() {
 	}
 
 	// Watch the config file for changes
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		level.Error(logger).Log("failed to create watcher", "err", err)
-		os.Exit(1)
-	}
+	if cfg.autoReload {
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			level.Error(logger).Log("failed to create watcher", "err", err)
+			os.Exit(1)
+		}
 
-	go func() {
-		for {
-			select {
-			case <-watcher.Events: // reload on all events
-				if err := reloadConfig(cfg.configFile, logger, reloaders...); err != nil {
-					level.Error(logger).Log("failed to reload config", "err", err)
+		go func() {
+			for {
+				select {
+				case <-watcher.Events: // reload on all events
+					if err := reloadConfig(cfg.configFile, logger, reloaders...); err != nil {
+						level.Error(logger).Log("failed to reload config", "err", err)
+						os.Exit(1)
+					}
+
+				case err := <-watcher.Errors:
+					level.Error(logger).Log("file watch error", "err", err)
 					os.Exit(1)
 				}
-
-			case err := <-watcher.Errors:
-				level.Error(logger).Log("file watch error", "err", err)
-				os.Exit(1)
 			}
-		}
-	}()
+		}()
 
-	err = watcher.Add(cfg.configFile)
-	if err != nil {
-		level.Error(logger).Log("failed to add config file to watcher", "err", err)
-		os.Exit(1)
+		err = watcher.Add(cfg.configFile)
+		if err != nil {
+			level.Error(logger).Log("failed to add config file to watcher", "err", err)
+			os.Exit(1)
+		}
 	}
 
 	if err := g.Run(); err != nil {
