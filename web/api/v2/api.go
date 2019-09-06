@@ -38,12 +38,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/prometheus/prometheus/pkg/timestamp"
-	pb "github.com/prometheus/prometheus/prompb"
 )
-
-const commitChunkSize = 500
 
 var (
 	remoteWriteRollback = prometheus.NewCounterVec(

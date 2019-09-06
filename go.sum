@@ -66,7 +66,6 @@ github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda h1:NyywMz59neOoVR
 github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20190329191031-25c5027a8c7b h1:Yqiad0+sloMPdd/0Fg22actpFx0dekpzt1xJmVNVkU0=
 github.com/dgryski/go-sip13 v0.0.0-20190329191031-25c5027a8c7b/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
-github.com/digitalocean/prometheus v2.5.0+incompatible h1:NmPHUibXUl/RafYMQozhvQKnhxNncQKCUPujyaBcUlU=
 github.com/docker/go-units v0.3.3/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/docker/go-units v0.4.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96/go.mod h1:Qh8CwZgvJUkLughtfhJv5dyTYa91l1fOUCrgjqmcifM=

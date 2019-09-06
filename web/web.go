@@ -66,8 +66,6 @@ import (
 	api_v1 "github.com/prometheus/prometheus/web/api/v1"
 	api_v2 "github.com/prometheus/prometheus/web/api/v2"
 	"github.com/prometheus/prometheus/web/ui"
-	"golang.org/x/net/netutil"
-	"google.golang.org/grpc"
 )
 
 var localhostRepresentations = []string{"127.0.0.1", "localhost"}

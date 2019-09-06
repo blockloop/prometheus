@@ -21,10 +21,8 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
-	"github.com/prometheus/prometheus/web/api/v2"
+	api_v2 "github.com/prometheus/prometheus/web/api/v2"
 )
-
-const commitChunkSize = 500
 
 // RemoteWrite is an HTTP handler to handle Prometheus remote_write
 func (h *Handler) write(w http.ResponseWriter, r *http.Request) {

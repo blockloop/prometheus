@@ -119,12 +119,6 @@ func writeTombstoneFile(logger log.Logger, dir string, tr TombstoneReader) (int6
 		return 0, merr.Err()
 	}
 
-	var merr tsdb_errors.MultiError
-	if merr.Add(f.Sync()); merr.Err() != nil {
-		merr.Add(f.Close())
-		return merr.Err()
-	}
-
 	if err = f.Close(); err != nil {
 		return 0, err
 	}

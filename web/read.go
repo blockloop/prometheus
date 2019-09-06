@@ -18,9 +18,9 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/digitalocean/prometheus/tsdb"
-	"github.com/digitalocean/prometheus/tsdb/labels"
 	"github.com/go-kit/kit/log/level"
+	"github.com/prometheus/prometheus/tsdb"
+	"github.com/prometheus/prometheus/tsdb/labels"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
