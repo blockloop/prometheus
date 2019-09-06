@@ -175,7 +175,7 @@ func TestFailedStartupExitCode(t *testing.T) {
 
 	prom := exec.Command(promPath, "--config.file="+fakeInputFile)
 	err := prom.Run()
-	testutil.NotOk(t, err, "")
+	testutil.NotOk(t, err)
 
 	if exitError, ok := err.(*exec.ExitError); ok {
 		status := exitError.Sys().(syscall.WaitStatus)
@@ -278,7 +278,7 @@ func TestWALSegmentSizeBounds(t *testing.T) {
 		}
 
 		err = prom.Wait()
-		testutil.NotOk(t, err, "")
+		testutil.NotOk(t, err)
 		if exitError, ok := err.(*exec.ExitError); ok {
 			status := exitError.Sys().(syscall.WaitStatus)
 			testutil.Equals(t, expectedExitStatus, status.ExitStatus())

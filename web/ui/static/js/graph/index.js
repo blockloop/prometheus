@@ -246,7 +246,7 @@ Prometheus.Graph.prototype.checkTimeDrift = function() {
             var diff = Math.abs(browserTime - serverTime);
 
             if (diff >= 30) {
-              this.showWarning(
+              self.showWarning(
                   "<div class=\"alert alert-warning\"><strong>Warning!</strong> Detected " +
                   diff.toFixed(2) +
                   " seconds time difference between your browser and the server. Prometheus relies on accurate time and time drift might cause unexpected query results.</div>"
@@ -511,6 +511,10 @@ Prometheus.Graph.prototype.submitQuery = function() {
         if (json.status !== "success") {
           self.showError(json.error);
           return;
+        }
+
+        if ("warnings" in json && json.warnings.length > 0) {
+          self.showWarning(json.warnings.join('<br>'));
         }
 
         queryHistory.handleHistory(self);

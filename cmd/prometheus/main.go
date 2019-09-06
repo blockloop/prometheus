@@ -36,23 +36,23 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/oklog/oklog/pkg/group"
+	conntrack "github.com/mwitkow/go-conntrack"
+	"github.com/oklog/run"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
+	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/version"
-	prom_runtime "github.com/prometheus/prometheus/pkg/runtime"
-	"gopkg.in/alecthomas/kingpin.v2"
+	kingpin "gopkg.in/alecthomas/kingpin.v2"
 	"k8s.io/klog"
 
-	"github.com/mwitkow/go-conntrack"
-	"github.com/prometheus/common/promlog"
 	promlogflag "github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
 	sd_config "github.com/prometheus/prometheus/discovery/config"
 	"github.com/prometheus/prometheus/notifier"
 	"github.com/prometheus/prometheus/pkg/relabel"
+	prom_runtime "github.com/prometheus/prometheus/pkg/runtime"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/rules"
 	"github.com/prometheus/prometheus/scrape"
@@ -125,6 +125,10 @@ func main() {
 		notifier: notifier.Options{
 			Registerer: prometheus.DefaultRegisterer,
 		},
+		web: web.Options{
+			Registerer: prometheus.DefaultRegisterer,
+			Gatherer:   prometheus.DefaultGatherer,
+		},
 		promlogConfig: promlog.Config{},
 	}
 
@@ -176,6 +180,9 @@ func main() {
 	a.Flag("web.page-title", "Document title of Prometheus instance.").
 		Default("Prometheus Time Series Collection and Processing Server").StringVar(&cfg.web.PageTitle)
 
+	a.Flag("web.cors.origin", `Regex for CORS origin. It is fully anchored. Example: 'https?://(domain1|domain2)\.com'`).
+		Default(".*").StringVar(&cfg.corsRegexString)
+
 	a.Flag("storage.tsdb.path", "Base path for metrics storage.").
 		Default("data/").StringVar(&cfg.localStoragePath)
 
@@ -183,14 +190,14 @@ func main() {
 		Hidden().Default("2h").SetValue(&cfg.tsdb.MinBlockDuration)
 
 	a.Flag("storage.tsdb.max-block-duration",
-		"Maximum duration compacted blocks may span. For use in testing. (Defaults to 10% of the retention period).").
+		"Maximum duration compacted blocks may span. For use in testing. (Defaults to 10% of the retention period.)").
 		Hidden().PlaceHolder("<duration>").SetValue(&cfg.tsdb.MaxBlockDuration)
 
 	a.Flag("storage.tsdb.wal-segment-size",
-		"Size at which to split the tsdb WAL segment files (e.g. 100MB)").
+		"Size at which to split the tsdb WAL segment files. Example: 100MB").
 		Hidden().PlaceHolder("<bytes>").BytesVar(&cfg.tsdb.WALSegmentSize)
 
-	a.Flag("storage.tsdb.retention", "[DEPRECATED] How long to retain samples in storage. This flag has been deprecated, use \"storage.tsdb.retention.time\" instead").
+	a.Flag("storage.tsdb.retention", "[DEPRECATED] How long to retain samples in storage. This flag has been deprecated, use \"storage.tsdb.retention.time\" instead.").
 		SetValue(&oldFlagRetentionDuration)
 
 	a.Flag("storage.tsdb.retention.time", "How long to retain samples in storage. When this flag is set it overrides \"storage.tsdb.retention\". If neither this flag nor \"storage.tsdb.retention\" nor \"storage.tsdb.retention.size\" is set, the retention time defaults to "+defaultRetentionString+".").
@@ -202,22 +209,28 @@ func main() {
 	a.Flag("storage.tsdb.no-lockfile", "Do not create lockfile in data directory.").
 		Default("false").BoolVar(&cfg.tsdb.NoLockfile)
 
-	a.Flag("storage.tsdb.allow-overlapping-blocks", "[EXPERIMENTAL] Allow overlapping blocks which in-turn enables vertical compaction and vertical query merge.").
+	a.Flag("storage.tsdb.allow-overlapping-blocks", "[EXPERIMENTAL] Allow overlapping blocks, which in turn enables vertical compaction and vertical query merge.").
 		Default("false").BoolVar(&cfg.tsdb.AllowOverlappingBlocks)
+
+	a.Flag("storage.tsdb.wal-compression", "Compress the tsdb WAL.").
+		Default("false").BoolVar(&cfg.tsdb.WALCompression)
 
 	a.Flag("storage.remote.flush-deadline", "How long to wait flushing sample on shutdown or config reload.").
 		Default("1m").PlaceHolder("<duration>").SetValue(&cfg.RemoteFlushDeadline)
 
-	a.Flag("storage.remote.read-sample-limit", "Maximum overall number of samples to return via the remote read interface, in a single query. 0 means no limit.").
+	a.Flag("storage.remote.read-sample-limit", "Maximum overall number of samples to return via the remote read interface, in a single query. 0 means no limit. This limit is ignored for streamed response types.").
 		Default("5e7").IntVar(&cfg.web.RemoteReadSampleLimit)
 
 	a.Flag("storage.remote.read-concurrent-limit", "Maximum number of concurrent remote read calls. 0 means no limit.").
 		Default("10").IntVar(&cfg.web.RemoteReadConcurrencyLimit)
 
-	a.Flag("rules.alert.for-outage-tolerance", "Max time to tolerate prometheus outage for restoring 'for' state of alert.").
+	a.Flag("storage.remote.read-max-bytes-in-frame", "Maximum number of bytes in a single frame for streaming remote read response types before marshalling. Note that client might have limit on frame size as well. 1MB as recommended by protobuf by default.").
+		Default("1048576").IntVar(&cfg.web.RemoteReadBytesInFrame)
+
+	a.Flag("rules.alert.for-outage-tolerance", "Max time to tolerate prometheus outage for restoring \"for\" state of alert.").
 		Default("1h").SetValue(&cfg.outageTolerance)
 
-	a.Flag("rules.alert.for-grace-period", "Minimum duration between alert and restored 'for' state. This is maintained only for alerts with configured 'for' time greater than grace period.").
+	a.Flag("rules.alert.for-grace-period", "Minimum duration between alert and restored \"for\" state. This is maintained only for alerts with configured \"for\" time greater than grace period.").
 		Default("10m").SetValue(&cfg.forGracePeriod)
 
 	a.Flag("rules.alert.resend-delay", "Minimum amount of time to wait before resending an alert to Alertmanager.").
@@ -229,7 +242,7 @@ func main() {
 	a.Flag("alertmanager.timeout", "Timeout for sending alerts to Alertmanager.").
 		Default("10s").SetValue(&cfg.notifierTimeout)
 
-	a.Flag("query.lookback-delta", "The delta difference allowed for retrieving metrics during expression evaluations.").
+	a.Flag("query.lookback-delta", "The maximum lookback duration for retrieving metrics during expression evaluations.").
 		Default("5m").SetValue(&cfg.lookbackDelta)
 
 	a.Flag("query.timeout", "Maximum time a query may take before being aborted.").
@@ -237,11 +250,9 @@ func main() {
 
 	a.Flag("query.max-concurrency", "Maximum number of queries executed concurrently.").
 		Default("20").IntVar(&cfg.queryConcurrency)
-	a.Flag("query.max-samples", "Maximum number of samples a single query can load into memory. Note that queries will fail if they would load more samples than this into memory, so this also limits the number of samples a query can return.").
-		Default("50000000").IntVar(&cfg.queryMaxSamples)
 
-	a.Flag("web.cors.origin", `Regex for CORS origin. It is fully anchored. Eg. 'https?://(domain1|domain2)\.com'`).
-		Default(".*").StringVar(&cfg.corsRegexString)
+	a.Flag("query.max-samples", "Maximum number of samples a single query can load into memory. Note that queries will fail if they try to load more samples than this into memory, so this also limits the number of samples a query can return.").
+		Default("50000000").IntVar(&cfg.queryMaxSamples)
 
 	promlogflag.AddFlags(a, &cfg.promlogConfig)
 
@@ -297,7 +308,7 @@ func main() {
 				panic(err)
 			}
 			cfg.tsdb.RetentionDuration = y
-			level.Info(logger).Log("msg", "time retention value is too high. Limiting to: "+y.String())
+			level.Warn(logger).Log("msg", "time retention value is too high. Limiting to: "+y.String())
 		}
 	}
 
@@ -350,12 +361,14 @@ func main() {
 		scrapeManager = scrape.NewManager(log.With(logger, "component", "scrape manager"), fanoutStorage)
 
 		opts = promql.EngineOpts{
-			Logger:        log.With(logger, "component", "query engine"),
-			Reg:           prometheus.DefaultRegisterer,
-			MaxConcurrent: cfg.queryConcurrency,
-			MaxSamples:    cfg.queryMaxSamples,
-			Timeout:       time.Duration(cfg.queryTimeout),
+			Logger:             log.With(logger, "component", "query engine"),
+			Reg:                prometheus.DefaultRegisterer,
+			MaxConcurrent:      cfg.queryConcurrency,
+			MaxSamples:         cfg.queryMaxSamples,
+			Timeout:            time.Duration(cfg.queryTimeout),
+			ActiveQueryTracker: promql.NewActiveQueryTracker(cfg.localStoragePath, cfg.queryConcurrency, log.With(logger, "component", "activeQueryTracker")),
 		}
+
 		queryEngine = promql.NewEngine(opts)
 
 		ruleManager = rules.NewManager(&rules.ManagerOptions{
@@ -403,7 +416,7 @@ func main() {
 		cfg.web.Flags[f.Name] = f.Value.String()
 	}
 
-	// Depends on cfg.web.ScrapeManager so needs to be after cfg.web.ScrapeManager = scrapeManager
+	// Depends on cfg.web.ScrapeManager so needs to be after cfg.web.ScrapeManager = scrapeManager.
 	webHandler := web.New(log.With(logger, "component", "web"), &cfg.web)
 
 	// Monitor outgoing connections on default transport with conntrack.
@@ -444,11 +457,15 @@ func main() {
 				fs, err := filepath.Glob(pat)
 				if err != nil {
 					// The only error can be a bad pattern.
-					return fmt.Errorf("error retrieving rule files for %s: %s", pat, err)
+					return errors.Wrapf(err, "error retrieving rule files for %s", pat)
 				}
 				files = append(files, fs...)
 			}
-			return ruleManager.Update(time.Duration(cfg.GlobalConfig.EvaluationInterval), files)
+			return ruleManager.Update(
+				time.Duration(cfg.GlobalConfig.EvaluationInterval),
+				files,
+				cfg.GlobalConfig.ExternalLabels,
+			)
 		},
 	}
 
@@ -475,7 +492,7 @@ func main() {
 		})
 	}
 
-	var g group.Group
+	var g run.Group
 	{
 		// Termination handler.
 		term := make(chan os.Signal, 1)
@@ -605,7 +622,7 @@ func main() {
 				}
 
 				if err := reloadConfig(cfg.configFile, logger, reloaders...); err != nil {
-					return fmt.Errorf("error loading config from %q: %s", cfg.configFile, err)
+					return errors.Wrapf(err, "error loading config from %q", cfg.configFile)
 				}
 
 				reloadReady.Close()
@@ -655,8 +672,9 @@ func main() {
 					&cfg.tsdb,
 				)
 				if err != nil {
-					return fmt.Errorf("opening storage failed: %s", err)
+					return errors.Wrapf(err, "opening storage failed")
 				}
+				level.Info(logger).Log("fs_type", prom_runtime.Statfs(cfg.localStoragePath))
 				level.Info(logger).Log("msg", "TSDB started")
 				level.Debug(logger).Log("msg", "TSDB options",
 					"MinBlockDuration", cfg.tsdb.MinBlockDuration,
@@ -666,6 +684,7 @@ func main() {
 					"RetentionDuration", cfg.tsdb.RetentionDuration,
 					"WALSegmentSize", cfg.tsdb.WALSegmentSize,
 					"AllowOverlappingBlocks", cfg.tsdb.AllowOverlappingBlocks,
+					"WALCompression", cfg.tsdb.WALCompression,
 				)
 
 				startTimeMargin := int64(2 * time.Duration(cfg.tsdb.MinBlockDuration).Seconds() * 1000)
@@ -687,7 +706,7 @@ func main() {
 		g.Add(
 			func() error {
 				if err := webHandler.Run(ctxWeb); err != nil {
-					return fmt.Errorf("error starting web server: %s", err)
+					return errors.Wrapf(err, "error starting web server")
 				}
 				return nil
 			},
@@ -771,7 +790,7 @@ func reloadConfig(filename string, logger log.Logger, rls ...func(*config.Config
 
 	conf, err := config.LoadFile(filename)
 	if err != nil {
-		return fmt.Errorf("couldn't load configuration (--config.file=%q): %v", filename, err)
+		return errors.Wrapf(err, "couldn't load configuration (--config.file=%q)", filename)
 	}
 
 	failed := false
@@ -782,8 +801,9 @@ func reloadConfig(filename string, logger log.Logger, rls ...func(*config.Config
 		}
 	}
 	if failed {
-		return fmt.Errorf("one or more errors occurred while applying the new configuration (--config.file=%q)", filename)
+		return errors.Errorf("one or more errors occurred while applying the new configuration (--config.file=%q)", filename)
 	}
+
 	promql.SetDefaultEvaluationInterval(time.Duration(conf.GlobalConfig.EvaluationInterval))
 	level.Info(logger).Log("msg", "Completed loading of configuration file", "filename", filename)
 	return nil
@@ -819,7 +839,7 @@ func computeExternalURL(u, listenAddr string) (*url.URL, error) {
 	}
 
 	if startsOrEndsWithQuote(u) {
-		return nil, fmt.Errorf("URL must not begin or end with quotes")
+		return nil, errors.New("URL must not begin or end with quotes")
 	}
 
 	eu, err := url.Parse(u)

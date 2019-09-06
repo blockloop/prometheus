@@ -56,6 +56,7 @@ If functions are used in a pipeline, the pipeline value is passed as the last ar
 | humanize      | number        | string  | Converts a number to a more readable format, using [metric prefixes](https://en.wikipedia.org/wiki/Metric_prefix).
 | humanize1024  | number        | string  | Like `humanize`, but uses 1024 as the base rather than 1000. |
 | humanizeDuration | number     | string  | Converts a duration in seconds to a more readable format. |
+| humanizePercentage | number   | string  | Converts a ratio value to a fraction of 100. |
 | humanizeTimestamp | number    | string  | Converts a Unix timestamp in seconds to a more readable format. |
 
 Humanizing functions are intended to produce reasonable output for consumption
@@ -89,8 +90,10 @@ parameterize templates, and have a few other differences.
 
 ### Alert field templates
 
-`.Value` and `.Labels` contain the alert value and labels. They are also exposed
-as the `$value` and `$labels` variables for convenience.
+`.Value`, `.Labels`, and `ExternalLabels` contain the alert value, the alert
+labels, and the globally configured external labels, respectively. They are
+also exposed as the `$value`, `$labels`, and `$externalLabels` variables for
+convenience.
 
 ### Console templates
 
@@ -104,7 +107,9 @@ auto-escaping. To bypass the auto-escaping use the `safe*` functions.,
 URL parameters are available as a map in `.Params`. To access multiple URL
 parameters by the same name, `.RawParams` is a map of the list values for each
 parameter. The URL path is available in `.Path`, excluding the `/consoles/`
-prefix.
+prefix. The globally configured external labels are available as
+`.ExternalLabels`. There are also convenience variables for all four:
+`$rawParams`, `$params`, `$path`, and `$externalLabels`.
 
 Consoles also have access to all the templates defined with `{{define
 "templateName"}}...{{end}}` found in `*.lib` files in the directory pointed to

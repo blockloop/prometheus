@@ -25,6 +25,7 @@ import (
 )
 
 func makeEndpoints() *v1.Endpoints {
+	var nodeName = "foobar"
 	return &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testendpoints",
@@ -34,7 +35,9 @@ func makeEndpoints() *v1.Endpoints {
 			{
 				Addresses: []v1.EndpointAddress{
 					{
-						IP: "1.2.3.4",
+						IP:       "1.2.3.4",
+						Hostname: "testendpoint1",
+						NodeName: &nodeName,
 					},
 				},
 				Ports: []v1.EndpointPort{
@@ -83,6 +86,8 @@ func TestEndpointsDiscoveryBeforeRun(t *testing.T) {
 				Targets: []model.LabelSet{
 					{
 						"__address__":                              "1.2.3.4:9000",
+						"__meta_kubernetes_endpoint_hostname":      "testendpoint1",
+						"__meta_kubernetes_endpoint_node_name":     "foobar",
 						"__meta_kubernetes_endpoint_port_name":     "testport",
 						"__meta_kubernetes_endpoint_port_protocol": "TCP",
 						"__meta_kubernetes_endpoint_ready":         "true",
@@ -357,7 +362,7 @@ func TestEndpointsDiscoveryWithService(t *testing.T) {
 					Name:      "testendpoints",
 					Namespace: "default",
 					Labels: map[string]string{
-						"app": "test",
+						"app/name": "test",
 					},
 				},
 			}
@@ -369,6 +374,8 @@ func TestEndpointsDiscoveryWithService(t *testing.T) {
 				Targets: []model.LabelSet{
 					{
 						"__address__":                              "1.2.3.4:9000",
+						"__meta_kubernetes_endpoint_hostname":      "testendpoint1",
+						"__meta_kubernetes_endpoint_node_name":     "foobar",
 						"__meta_kubernetes_endpoint_port_name":     "testport",
 						"__meta_kubernetes_endpoint_port_protocol": "TCP",
 						"__meta_kubernetes_endpoint_ready":         "true",
@@ -387,10 +394,11 @@ func TestEndpointsDiscoveryWithService(t *testing.T) {
 					},
 				},
 				Labels: model.LabelSet{
-					"__meta_kubernetes_namespace":         "default",
-					"__meta_kubernetes_endpoints_name":    "testendpoints",
-					"__meta_kubernetes_service_label_app": "test",
-					"__meta_kubernetes_service_name":      "testendpoints",
+					"__meta_kubernetes_namespace":                     "default",
+					"__meta_kubernetes_endpoints_name":                "testendpoints",
+					"__meta_kubernetes_service_label_app_name":        "test",
+					"__meta_kubernetes_service_labelpresent_app_name": "true",
+					"__meta_kubernetes_service_name":                  "testendpoints",
 				},
 				Source: "endpoints/default/testendpoints",
 			},
@@ -409,7 +417,7 @@ func TestEndpointsDiscoveryWithServiceUpdate(t *testing.T) {
 					Name:      "testendpoints",
 					Namespace: "default",
 					Labels: map[string]string{
-						"app": "test",
+						"app/name": "test",
 					},
 				},
 			}
@@ -421,7 +429,7 @@ func TestEndpointsDiscoveryWithServiceUpdate(t *testing.T) {
 					Name:      "testendpoints",
 					Namespace: "default",
 					Labels: map[string]string{
-						"app":       "svc",
+						"app/name":  "svc",
 						"component": "testing",
 					},
 				},
@@ -434,6 +442,8 @@ func TestEndpointsDiscoveryWithServiceUpdate(t *testing.T) {
 				Targets: []model.LabelSet{
 					{
 						"__address__":                              "1.2.3.4:9000",
+						"__meta_kubernetes_endpoint_hostname":      "testendpoint1",
+						"__meta_kubernetes_endpoint_node_name":     "foobar",
 						"__meta_kubernetes_endpoint_port_name":     "testport",
 						"__meta_kubernetes_endpoint_port_protocol": "TCP",
 						"__meta_kubernetes_endpoint_ready":         "true",
@@ -452,11 +462,13 @@ func TestEndpointsDiscoveryWithServiceUpdate(t *testing.T) {
 					},
 				},
 				Labels: model.LabelSet{
-					"__meta_kubernetes_namespace":               "default",
-					"__meta_kubernetes_endpoints_name":          "testendpoints",
-					"__meta_kubernetes_service_label_app":       "svc",
-					"__meta_kubernetes_service_name":            "testendpoints",
-					"__meta_kubernetes_service_label_component": "testing",
+					"__meta_kubernetes_namespace":                      "default",
+					"__meta_kubernetes_endpoints_name":                 "testendpoints",
+					"__meta_kubernetes_service_label_app_name":         "svc",
+					"__meta_kubernetes_service_labelpresent_app_name":  "true",
+					"__meta_kubernetes_service_name":                   "testendpoints",
+					"__meta_kubernetes_service_label_component":        "testing",
+					"__meta_kubernetes_service_labelpresent_component": "true",
 				},
 				Source: "endpoints/default/testendpoints",
 			},
@@ -542,6 +554,8 @@ func TestEndpointsDiscoveryNamespaces(t *testing.T) {
 				Targets: []model.LabelSet{
 					{
 						"__address__":                              "1.2.3.4:9000",
+						"__meta_kubernetes_endpoint_hostname":      "testendpoint1",
+						"__meta_kubernetes_endpoint_node_name":     "foobar",
 						"__meta_kubernetes_endpoint_port_name":     "testport",
 						"__meta_kubernetes_endpoint_port_protocol": "TCP",
 						"__meta_kubernetes_endpoint_ready":         "true",
@@ -560,10 +574,11 @@ func TestEndpointsDiscoveryNamespaces(t *testing.T) {
 					},
 				},
 				Labels: model.LabelSet{
-					"__meta_kubernetes_namespace":         "ns1",
-					"__meta_kubernetes_endpoints_name":    "testendpoints",
-					"__meta_kubernetes_service_label_app": "app1",
-					"__meta_kubernetes_service_name":      "testendpoints",
+					"__meta_kubernetes_namespace":                "ns1",
+					"__meta_kubernetes_endpoints_name":           "testendpoints",
+					"__meta_kubernetes_service_label_app":        "app1",
+					"__meta_kubernetes_service_labelpresent_app": "true",
+					"__meta_kubernetes_service_name":             "testendpoints",
 				},
 				Source: "endpoints/ns1/testendpoints",
 			},

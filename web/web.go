@@ -37,17 +37,23 @@ import (
 	template_text "text/template"
 	"time"
 
-	"github.com/cockroachdb/cmux"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/mwitkow/go-conntrack"
+	conntrack "github.com/mwitkow/go-conntrack"
 	"github.com/opentracing-contrib/go-stdlib/nethttp"
-	"github.com/opentracing/opentracing-go"
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/common/route"
+	"github.com/prometheus/common/server"
+	"github.com/prometheus/prometheus/tsdb"
+	"github.com/soheilhy/cmux"
+	"golang.org/x/net/netutil"
+	"google.golang.org/grpc"
+
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/notifier"
 	"github.com/prometheus/prometheus/promql"
@@ -86,32 +92,70 @@ func withStackTracer(h http.Handler, l log.Logger) http.Handler {
 	})
 }
 
-var (
-	requestDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "prometheus_http_request_duration_seconds",
-			Help:    "Histogram of latencies for HTTP requests.",
-			Buckets: []float64{.1, .2, .4, 1, 3, 8, 20, 60, 120},
-		},
-		[]string{"handler"},
-	)
-	responseSize = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "prometheus_http_response_size_bytes",
-			Help:    "Histogram of response size for HTTP requests.",
-			Buckets: prometheus.ExponentialBuckets(100, 10, 8),
-		},
-		[]string{"handler"},
-	)
-)
+type metrics struct {
+	requestCounter  *prometheus.CounterVec
+	requestDuration *prometheus.HistogramVec
+	responseSize    *prometheus.HistogramVec
+}
 
-func init() {
-	prometheus.MustRegister(requestDuration, responseSize)
+func newMetrics(r prometheus.Registerer) *metrics {
+	m := &metrics{
+		requestCounter: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "prometheus_http_requests_total",
+				Help: "Counter of HTTP requests.",
+			},
+			[]string{"handler", "code"},
+		),
+		requestDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "prometheus_http_request_duration_seconds",
+				Help:    "Histogram of latencies for HTTP requests.",
+				Buckets: []float64{.1, .2, .4, 1, 3, 8, 20, 60, 120},
+			},
+			[]string{"handler"},
+		),
+		responseSize: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "prometheus_http_response_size_bytes",
+				Help:    "Histogram of response size for HTTP requests.",
+				Buckets: prometheus.ExponentialBuckets(100, 10, 8),
+			},
+			[]string{"handler"},
+		),
+	}
+
+	if r != nil {
+		r.MustRegister(m.requestCounter, m.requestDuration, m.responseSize)
+	}
+	return m
+}
+
+func (m *metrics) instrumentHandlerWithPrefix(prefix string) func(handlerName string, handler http.HandlerFunc) http.HandlerFunc {
+	return func(handlerName string, handler http.HandlerFunc) http.HandlerFunc {
+		return m.instrumentHandler(prefix+handlerName, handler)
+	}
+}
+
+func (m *metrics) instrumentHandler(handlerName string, handler http.HandlerFunc) http.HandlerFunc {
+	return promhttp.InstrumentHandlerCounter(
+		m.requestCounter.MustCurryWith(prometheus.Labels{"handler": handlerName}),
+		promhttp.InstrumentHandlerDuration(
+			m.requestDuration.MustCurryWith(prometheus.Labels{"handler": handlerName}),
+			promhttp.InstrumentHandlerResponseSize(
+				m.responseSize.MustCurryWith(prometheus.Labels{"handler": handlerName}),
+				handler,
+			),
+		),
+	)
 }
 
 // Handler serves various HTTP endpoints of the Prometheus server
 type Handler struct {
 	logger log.Logger
+
+	gatherer prometheus.Gatherer
+	metrics  *metrics
 
 	scrapeManager *scrape.Manager
 	ruleManager   *rules.Manager
@@ -187,38 +231,32 @@ type Options struct {
 	PageTitle                  string
 	RemoteReadSampleLimit      int
 	RemoteReadConcurrencyLimit int
-}
+	RemoteReadBytesInFrame     int
 
-func instrumentHandlerWithPrefix(prefix string) func(handlerName string, handler http.HandlerFunc) http.HandlerFunc {
-	return func(handlerName string, handler http.HandlerFunc) http.HandlerFunc {
-		return instrumentHandler(prefix+handlerName, handler)
-	}
-}
-
-func instrumentHandler(handlerName string, handler http.HandlerFunc) http.HandlerFunc {
-	return promhttp.InstrumentHandlerDuration(
-		requestDuration.MustCurryWith(prometheus.Labels{"handler": handlerName}),
-		promhttp.InstrumentHandlerResponseSize(
-			responseSize.MustCurryWith(prometheus.Labels{"handler": handlerName}),
-			handler,
-		),
-	)
+	Gatherer   prometheus.Gatherer
+	Registerer prometheus.Registerer
 }
 
 // New initializes a new web Handler.
 func New(logger log.Logger, o *Options) *Handler {
-	router := route.New().WithInstrumentation(instrumentHandler)
-	cwd, err := os.Getwd()
-
-	if err != nil {
-		cwd = "<error retrieving current working directory>"
-	}
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
 
+	m := newMetrics(o.Registerer)
+	router := route.New().WithInstrumentation(m.instrumentHandler)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "<error retrieving current working directory>"
+	}
+
 	h := &Handler{
-		logger:      logger,
+		logger: logger,
+
+		gatherer: o.Gatherer,
+		metrics:  m,
+
 		router:      router,
 		quitCh:      make(chan struct{}),
 		reloadCh:    make(chan chan error),
@@ -250,16 +288,14 @@ func New(logger log.Logger, o *Options) *Handler {
 		o.Flags,
 		h.testReady,
 		func() api_v1.TSDBAdmin {
-			if db := h.options.TSDB(); db != nil {
-				return db
-			}
-			return nil
+			return h.options.TSDB()
 		},
 		h.options.EnableAdminAPI,
 		logger,
 		h.ruleManager,
 		h.options.RemoteReadSampleLimit,
 		h.options.RemoteReadConcurrencyLimit,
+		h.options.RemoteReadBytesInFrame,
 		h.options.CORSOrigin,
 	)
 
@@ -299,7 +335,7 @@ func New(logger log.Logger, o *Options) *Handler {
 
 	router.Get("/static/*filepath", func(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = path.Join("/static", route.Param(r.Context(), "filepath"))
-		fs := http.FileServer(ui.Assets)
+		fs := server.StaticFileServer(ui.Assets)
 		fs.ServeHTTP(w, r)
 	})
 
@@ -309,7 +345,9 @@ func New(logger log.Logger, o *Options) *Handler {
 
 	if o.EnableLifecycle {
 		router.Post("/-/quit", h.quit)
+		router.Put("/-/quit", h.quit)
 		router.Post("/-/reload", h.reload)
+		router.Put("/-/reload", h.reload)
 	} else {
 		router.Post("/-/quit", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusForbidden)
@@ -322,11 +360,11 @@ func New(logger log.Logger, o *Options) *Handler {
 	}
 	router.Get("/-/quit", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("Only POST requests allowed"))
+		w.Write([]byte("Only POST or PUT requests allowed"))
 	})
 	router.Get("/-/reload", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("Only POST requests allowed"))
+		w.Write([]byte("Only POST or PUT requests allowed"))
 	})
 
 	router.Get("/debug/*subpath", serveDebug)
@@ -428,8 +466,9 @@ func (h *Handler) Run(ctx context.Context) error {
 		conntrack.TrackWithTracing())
 
 	var (
-		m       = cmux.New(listener)
-		grpcl   = m.Match(cmux.HTTP2HeaderField("content-type", "application/grpc"))
+		m = cmux.New(listener)
+		// See https://github.com/grpc/grpc-go/issues/2636 for why we need to use MatchWithWriters().
+		grpcl   = m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
 		httpl   = m.Match(cmux.HTTP1Fast())
 		grpcSrv = grpc.NewServer()
 	)
@@ -453,7 +492,7 @@ func (h *Handler) Run(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.Handle("/", h.router)
 
-	av1 := route.New().WithInstrumentation(instrumentHandlerWithPrefix("/api/v1"))
+	av1 := route.New().WithInstrumentation(h.metrics.instrumentHandlerWithPrefix("/api/v1"))
 	h.apiV1.Register(av1)
 	apiPath := "/api"
 	if h.options.RoutePrefix != "/" {
@@ -500,12 +539,16 @@ func (h *Handler) Run(ctx context.Context) error {
 }
 
 func (h *Handler) alerts(w http.ResponseWriter, r *http.Request) {
-	alerts := h.ruleManager.AlertingRules()
-	alertsSorter := byAlertStateAndNameSorter{alerts: alerts}
-	sort.Sort(alertsSorter)
+
+	var groups []*rules.Group
+	for _, group := range h.ruleManager.RuleGroups() {
+		if group.HasAlertingRules() {
+			groups = append(groups, group)
+		}
+	}
 
 	alertStatus := AlertStatus{
-		AlertingRules: alertsSorter.alerts,
+		Groups: groups,
 		AlertStateToRowClass: map[rules.AlertState]string{
 			rules.StateInactive: "success",
 			rules.StatePending:  "warning",
@@ -542,19 +585,39 @@ func (h *Handler) consoles(w http.ResponseWriter, r *http.Request) {
 	for k, v := range rawParams {
 		params[k] = v[0]
 	}
+
+	externalLabels := map[string]string{}
+	h.mtx.RLock()
+	els := h.config.GlobalConfig.ExternalLabels
+	h.mtx.RUnlock()
+	for _, el := range els {
+		externalLabels[el.Name] = el.Value
+	}
+
+	// Inject some convenience variables that are easier to remember for users
+	// who are not used to Go's templating system.
+	defs := []string{
+		"{{$rawParams := .RawParams }}",
+		"{{$params := .Params}}",
+		"{{$path := .Path}}",
+		"{{$externalLabels := .ExternalLabels}}",
+	}
+
 	data := struct {
-		RawParams url.Values
-		Params    map[string]string
-		Path      string
+		RawParams      url.Values
+		Params         map[string]string
+		Path           string
+		ExternalLabels map[string]string
 	}{
-		RawParams: rawParams,
-		Params:    params,
-		Path:      strings.TrimLeft(name, "/"),
+		RawParams:      rawParams,
+		Params:         params,
+		Path:           strings.TrimLeft(name, "/"),
+		ExternalLabels: externalLabels,
 	}
 
 	tmpl := template.NewTemplateExpander(
 		h.context,
-		string(text),
+		strings.Join(append(defs, string(text)), ""),
 		"__console_"+name,
 		data,
 		h.now(),
@@ -587,6 +650,7 @@ func (h *Handler) status(w http.ResponseWriter, r *http.Request) {
 		GoroutineCount      int
 		GOMAXPROCS          int
 		GOGC                string
+		GODEBUG             string
 		CorruptionCount     int64
 		ChunkCount          int64
 		TimeSeriesCount     int64
@@ -601,6 +665,7 @@ func (h *Handler) status(w http.ResponseWriter, r *http.Request) {
 		GoroutineCount: runtime.NumGoroutine(),
 		GOMAXPROCS:     runtime.GOMAXPROCS(0),
 		GOGC:           os.Getenv("GOGC"),
+		GODEBUG:        os.Getenv("GODEBUG"),
 	}
 
 	if h.options.TSDBCfg.RetentionDuration != 0 {
@@ -613,7 +678,7 @@ func (h *Handler) status(w http.ResponseWriter, r *http.Request) {
 		status.StorageRetention = status.StorageRetention + h.options.TSDBCfg.MaxBytes.String()
 	}
 
-	metrics, err := prometheus.DefaultGatherer.Gather()
+	metrics, err := h.gatherer.Gather()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error gathering runtime status: %s", err), http.StatusInternalServerError)
 		return
@@ -868,11 +933,11 @@ func (h *Handler) getTemplate(name string) (string, error) {
 
 	err := appendf("_base.html")
 	if err != nil {
-		return "", fmt.Errorf("error reading base template: %s", err)
+		return "", errors.Wrap(err, "error reading base template")
 	}
 	err = appendf(name)
 	if err != nil {
-		return "", fmt.Errorf("error reading page template %s: %s", name, err)
+		return "", errors.Wrapf(err, "error reading page template %s", name)
 	}
 
 	return tmpl, nil
@@ -905,24 +970,6 @@ func (h *Handler) executeTemplate(w http.ResponseWriter, name string, data inter
 
 // AlertStatus bundles alerting rules and the mapping of alert states to row classes.
 type AlertStatus struct {
-	AlertingRules        []*rules.AlertingRule
+	Groups               []*rules.Group
 	AlertStateToRowClass map[rules.AlertState]string
-}
-
-type byAlertStateAndNameSorter struct {
-	alerts []*rules.AlertingRule
-}
-
-func (s byAlertStateAndNameSorter) Len() int {
-	return len(s.alerts)
-}
-
-func (s byAlertStateAndNameSorter) Less(i, j int) bool {
-	return s.alerts[i].State() > s.alerts[j].State() ||
-		(s.alerts[i].State() == s.alerts[j].State() &&
-			s.alerts[i].Name() < s.alerts[j].Name())
-}
-
-func (s byAlertStateAndNameSorter) Swap(i, j int) {
-	s.alerts[i], s.alerts[j] = s.alerts[j], s.alerts[i]
 }

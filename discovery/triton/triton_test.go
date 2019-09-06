@@ -23,11 +23,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/discovery/targetgroup"
+
 	"github.com/prometheus/prometheus/util/testutil"
 )
 
@@ -86,7 +85,7 @@ func TestTritonSDNew(t *testing.T) {
 
 func TestTritonSDNewBadConfig(t *testing.T) {
 	td, err := newTritonDiscovery(badconf)
-	testutil.NotOk(t, err, "")
+	testutil.NotOk(t, err)
 	testutil.Assert(t, td == nil, "")
 }
 
@@ -102,30 +101,6 @@ func TestTritonSDNewGroupsConfig(t *testing.T) {
 	testutil.Equals(t, groupsconf.Endpoint, td.sdConfig.Endpoint)
 	testutil.Equals(t, groupsconf.Groups, td.sdConfig.Groups)
 	testutil.Equals(t, groupsconf.Port, td.sdConfig.Port)
-}
-
-func TestTritonSDRun(t *testing.T) {
-	var (
-		td, _       = newTritonDiscovery(conf)
-		ch          = make(chan []*targetgroup.Group)
-		ctx, cancel = context.WithCancel(context.Background())
-	)
-
-	wait := make(chan struct{})
-	go func() {
-		td.Run(ctx, ch)
-		close(wait)
-	}()
-
-	select {
-	case <-time.After(60 * time.Millisecond):
-		// Expected.
-	case tgs := <-ch:
-		t.Fatalf("Unexpected target groups in triton discovery: %s", tgs)
-	}
-
-	cancel()
-	<-wait
 }
 
 func TestTritonSDRefreshNoTargets(t *testing.T) {
@@ -165,7 +140,7 @@ func TestTritonSDRefreshNoServer(t *testing.T) {
 	)
 
 	_, err := td.refresh(context.Background())
-	testutil.NotOk(t, err, "")
+	testutil.NotOk(t, err)
 	testutil.Equals(t, strings.Contains(err.Error(), "an error occurred when requesting targets from the discovery endpoint"), true)
 }
 
@@ -177,7 +152,7 @@ func TestTritonSDRefreshCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := td.refresh(ctx)
-	testutil.NotOk(t, err, "")
+	testutil.NotOk(t, err)
 	testutil.Equals(t, strings.Contains(err.Error(), context.Canceled.Error()), true)
 }
 
@@ -206,8 +181,10 @@ func testTritonSDRefresh(t *testing.T, dstr string) []model.LabelSet {
 
 	td.sdConfig.Port = port
 
-	tg, err := td.refresh(context.Background())
+	tgs, err := td.refresh(context.Background())
 	testutil.Ok(t, err)
+	testutil.Equals(t, 1, len(tgs))
+	tg := tgs[0]
 	testutil.Assert(t, tg != nil, "")
 
 	return tg.Targets
