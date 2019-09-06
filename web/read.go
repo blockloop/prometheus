@@ -18,13 +18,13 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/digitalocean/prometheus/tsdb"
+	"github.com/digitalocean/prometheus/tsdb/labels"
 	"github.com/go-kit/kit/log/level"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
-	"github.com/prometheus/tsdb"
-	"github.com/prometheus/tsdb/labels"
 )
 
 func (h *Handler) read(w http.ResponseWriter, r *http.Request) {

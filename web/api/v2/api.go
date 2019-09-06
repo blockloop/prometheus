@@ -35,8 +35,6 @@ import (
 	pb "github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/tsdb"
 	tsdbLabels "github.com/prometheus/prometheus/tsdb/labels"
-	"github.com/prometheus/tsdb"
-	tsdbLabels "github.com/prometheus/tsdb/labels"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
