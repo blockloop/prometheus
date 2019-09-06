@@ -175,7 +175,8 @@
             "$ref": "#/definitions/prometheusSample"
           }
         }
-      }
+      },
+      "description": "TimeSeries represents samples and labels for a single time series."
     },
     "prometheusWriteResponse": {
       "type": "object"
