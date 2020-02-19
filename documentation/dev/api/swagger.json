@@ -78,6 +78,17 @@
     }
   },
   "definitions": {
+    "prometheusLabel": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
     "prometheusLabelMatcher": {
       "type": "object",
       "properties": {
@@ -102,6 +113,19 @@
         "NRE"
       ],
       "default": "EQ"
+    },
+    "prometheusSample": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "format": "double"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
     },
     "prometheusSeriesDeleteRequest": {
       "type": "object",
@@ -135,6 +159,27 @@
           "type": "string"
         }
       }
+    },
+    "prometheusTimeSeries": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/prometheusLabel"
+          }
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/prometheusSample"
+          }
+        }
+      },
+      "description": "TimeSeries represents samples and labels for a single time series."
+    },
+    "prometheusWriteResponse": {
+      "type": "object"
     }
   }
 }
