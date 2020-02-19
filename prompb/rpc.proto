@@ -18,6 +18,7 @@ import "types.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "gogoproto/gogo.proto";
+import "remote.proto";
 
 option go_package = "prompb";
 
@@ -49,8 +50,12 @@ service Admin {
       body: "*"
     };
   }
+
+  rpc RemoteWrite(stream WriteRequest) returns (WriteResponse) {}
 }
 
+message WriteResponse {
+}
 
 message TSDBSnapshotRequest {
   bool skip_head = 1;

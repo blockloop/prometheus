@@ -16,16 +16,22 @@ package apiv2
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -33,14 +39,41 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/pkg/timestamp"
 	pb "github.com/prometheus/prometheus/prompb"
+	"github.com/prometheus/prometheus/storage"
 	"github.com/prometheus/prometheus/tsdb"
 )
+
+var (
+	remoteWriteRollback = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_remote_write_rollback",
+			Help: "TSDB rollbacks during remote write",
+		}, []string{"reason"},
+	)
+	remoteWriteRollbackFailure = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_remote_write_rollback_failure",
+			Help: "TSDB remote write appender rollback failures",
+		}, []string{"reason"},
+	)
+	remoteWriteCommitFailure = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "prometheus_remote_write_commit_failure",
+			Help: "TSDB remote write appender commit failures",
+		}, []string{"reason"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(remoteWriteRollback)
+}
 
 // API encapsulates all API services.
 type API struct {
 	enableAdmin bool
 	db          TSDBAdmin
 	dbDir       string
+	logger      log.Logger
 }
 
 // New returns a new API object.
@@ -48,18 +81,20 @@ func New(
 	db TSDBAdmin,
 	dbDir string,
 	enableAdmin bool,
+	logger log.Logger,
 ) *API {
 	return &API{
 		db:          db,
 		dbDir:       dbDir,
 		enableAdmin: enableAdmin,
+		logger:      logger,
 	}
 }
 
 // RegisterGRPC registers all API services with the given server.
 func (api *API) RegisterGRPC(srv *grpc.Server) {
 	if api.enableAdmin {
-		pb.RegisterAdminServer(srv, NewAdmin(api.db, api.dbDir))
+		pb.RegisterAdminServer(srv, NewAdmin(api.db, api.dbDir, api.logger))
 	} else {
 		pb.RegisterAdminServer(srv, &AdminDisabled{})
 	}
@@ -135,23 +170,29 @@ func (s *AdminDisabled) DeleteSeries(_ context.Context, r *pb.SeriesDeleteReques
 	return nil, errAdminDisabled
 }
 
+// RemoteWrite implements pb.AdminServer
+func (s *AdminDisabled) RemoteWrite(stream pb.Admin_RemoteWriteServer) error { return errAdminDisabled }
+
 // TSDBAdmin defines the tsdb interfaces used by the v1 API for admin operations as well as statistics.
 type TSDBAdmin interface {
 	CleanTombstones() error
 	Delete(mint, maxt int64, ms ...*labels.Matcher) error
 	Snapshot(dir string, withHead bool) error
+	Appender(ctx context.Context) storage.Appender
 }
 
 // Admin provides an administration interface to Prometheus.
 type Admin struct {
-	db    TSDBAdmin
-	dbDir string
+	db     TSDBAdmin
+	dbDir  string
+	logger log.Logger
 }
 
 // NewAdmin returns a Admin server.
-func NewAdmin(db TSDBAdmin, dbDir string) *Admin {
+func NewAdmin(db TSDBAdmin, dbDir string, logger log.Logger) *Admin {
 	return &Admin{
-		db: db,
+		db:     db,
+		logger: logger,
 	}
 }
 
@@ -227,4 +268,60 @@ func (s *Admin) DeleteSeries(_ context.Context, r *pb.SeriesDeleteRequest) (*pb.
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &pb.SeriesDeleteResponse{}, nil
+}
+
+// RemoteWrite receives a stream of write requests and performs a remote write action with them
+func (s *Admin) RemoteWrite(stream pb.Admin_RemoteWriteServer) error {
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			level.Error(s.logger).Log("msg", "read from grpc stream failure", "err", err)
+			return err
+		}
+
+		// Write all metrics sent
+		WriteTimeSeries(stream.Context(), resp.GetTimeseries(), s.db, s.logger)
+	}
+	return nil
+}
+
+// WriteTimeSeries writes a set of timeseries metrics to the tsdb
+func WriteTimeSeries(ctx context.Context, timeseries []pb.TimeSeries, db TSDBAdmin, logger log.Logger) {
+	ap := db.Appender(ctx)
+	if ap == nil {
+		level.Error(logger).Log("msg", "nil appender")
+		return
+	}
+
+	for _, ts := range timeseries {
+		lbls := make(labels.Labels, len(ts.Labels))
+		for j, l := range ts.Labels {
+			lbls[j] = labels.Label{
+				Name:  l.GetName(),
+				Value: l.GetValue(),
+			}
+		}
+		// sorting guarantees hash consistency
+		sort.Sort(lbls)
+
+		var ref uint64
+		var err error
+		for _, s := range ts.Samples {
+			ref, err = ap.Append(ref, lbls, s.GetTimestamp(), s.GetValue())
+			if err != nil {
+				remoteWriteRollback.WithLabelValues(err.Error()).Inc()
+				if err := ap.Rollback(); err != nil {
+					remoteWriteRollbackFailure.WithLabelValues(err.Error()).Inc()
+				}
+				return
+			}
+		}
+	}
+
+	if err := ap.Commit(); err != nil {
+		remoteWriteCommitFailure.WithLabelValues(err.Error()).Inc()
+	}
 }
