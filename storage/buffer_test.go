@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/tsdb/chunkenc"
 	"github.com/prometheus/prometheus/util/testutil"
 )
 
@@ -77,11 +78,11 @@ func TestSampleRing(t *testing.T) {
 						break
 					}
 				}
-				if sold.t >= s.t-c.delta && !found {
-					t.Fatalf("%d: expected sample %d to be in buffer but was not; buffer %v", i, sold.t, buffered)
-				}
-				if sold.t < s.t-c.delta && found {
-					t.Fatalf("%d: unexpected sample %d in buffer; buffer %v", i, sold.t, buffered)
+
+				if found {
+					testutil.Assert(t, sold.t >= s.t-c.delta, "%d: unexpected sample %d in buffer; buffer %v", i, sold.t, buffered)
+				} else {
+					testutil.Assert(t, sold.t < s.t-c.delta, "%d: expected sample %d to be in buffer but was not; buffer %v", i, sold.t, buffered)
 				}
 			}
 		}
@@ -190,7 +191,7 @@ func (m *mockSeriesIterator) Err() error           { return m.err() }
 
 type mockSeries struct {
 	labels   func() labels.Labels
-	iterator func() SeriesIterator
+	iterator func() chunkenc.Iterator
 }
 
 func newMockSeries(lset labels.Labels, samples []sample) Series {
@@ -198,14 +199,14 @@ func newMockSeries(lset labels.Labels, samples []sample) Series {
 		labels: func() labels.Labels {
 			return lset
 		},
-		iterator: func() SeriesIterator {
+		iterator: func() chunkenc.Iterator {
 			return newListSeriesIterator(samples)
 		},
 	}
 }
 
-func (m *mockSeries) Labels() labels.Labels    { return m.labels() }
-func (m *mockSeries) Iterator() SeriesIterator { return m.iterator() }
+func (m *mockSeries) Labels() labels.Labels       { return m.labels() }
+func (m *mockSeries) Iterator() chunkenc.Iterator { return m.iterator() }
 
 type listSeriesIterator struct {
 	list []sample

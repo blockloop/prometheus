@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/prometheus/tsdb/chunkenc"
 
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
@@ -263,7 +264,7 @@ type StorageSeries struct {
 	series Series
 }
 
-// NewStorageSeries returns a StorageSeries fromfor series.
+// NewStorageSeries returns a StorageSeries from a Series.
 func NewStorageSeries(series Series) *StorageSeries {
 	return &StorageSeries{
 		series: series,
@@ -275,7 +276,7 @@ func (ss *StorageSeries) Labels() labels.Labels {
 }
 
 // Iterator returns a new iterator of the data of the series.
-func (ss *StorageSeries) Iterator() storage.SeriesIterator {
+func (ss *StorageSeries) Iterator() chunkenc.Iterator {
 	return newStorageSeriesIterator(ss.series)
 }
 

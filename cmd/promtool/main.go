@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -303,7 +304,54 @@ func checkRules(filename string) (int, []error) {
 		numRules += len(rg.Rules)
 	}
 
+	dRules := checkDuplicates(rgs.Groups)
+	if len(dRules) != 0 {
+		fmt.Printf("%d duplicate rules(s) found.\n", len(dRules))
+		for _, n := range dRules {
+			fmt.Printf("Metric: %s\nLabel(s):\n", n.metric)
+			for i, l := range n.label {
+				fmt.Printf("\t%s: %s\n", i, l)
+			}
+		}
+		fmt.Println("Might cause inconsistency while recording expressions.")
+	}
+
 	return numRules, nil
+}
+
+type compareRuleType struct {
+	metric string
+	label  map[string]string
+}
+
+func checkDuplicates(groups []rulefmt.RuleGroup) []compareRuleType {
+	var duplicates []compareRuleType
+
+	for _, group := range groups {
+		for index, rule := range group.Rules {
+			inst := compareRuleType{
+				metric: ruleMetric(rule),
+				label:  rule.Labels,
+			}
+			for i := 0; i < index; i++ {
+				t := compareRuleType{
+					metric: ruleMetric(group.Rules[i]),
+					label:  group.Rules[i].Labels,
+				}
+				if reflect.DeepEqual(t, inst) {
+					duplicates = append(duplicates, t)
+				}
+			}
+		}
+	}
+	return duplicates
+}
+
+func ruleMetric(rule rulefmt.RuleNode) string {
+	if rule.Alert.Value != "" {
+		return rule.Alert.Value
+	}
+	return rule.Record.Value
 }
 
 var checkMetricsUsage = strings.TrimSpace(`

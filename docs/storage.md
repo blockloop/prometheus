@@ -13,7 +13,7 @@ Prometheus's local time series database stores time series data in a custom form
 
 ### On-disk layout
 
-Ingested samples are grouped into blocks of two hours. Each two-hour block consists of a directory containing one or more chunk files that contain all time series samples for that window of time, as well as a metadata file and index file (which indexes metric names and labels to time series in the chunk files).  When series are deleted via the API, deletion records are stored in separate tombstone files (instead of deleting the data immediately from the chunk files).
+Ingested samples are grouped into blocks of two hours. Each two-hour block consists of a directory containing one or more chunk files that contain all time series samples for that window of time, as well as a metadata file and index file (which indexes metric names and labels to time series in the chunk files). When series are deleted via the API, deletion records are stored in separate tombstone files (instead of deleting the data immediately from the chunk files).
 
 The block for currently incoming samples is kept in memory and not fully persisted yet. It is secured against crashes by a write-ahead-log (WAL) that can be replayed when the Prometheus server restarts after a crash. Write-ahead log files are stored in the `wal` directory in 128MB segments. These files contain raw data that has not been compacted yet, so they are significantly larger than regular block files. Prometheus will keep a minimum of 3 write-ahead log files, however high-traffic servers may see more than three WAL files since it needs to keep at least two hours worth of raw data.
 
@@ -43,7 +43,9 @@ The directory structure of a Prometheus server's data directory will look someth
 ```
 
 
-Note that a limitation of the local storage is that it is not clustered or replicated. Thus, it is not arbitrarily scalable or durable in the face of disk or node outages and should thus be treated as more of an ephemeral sliding window of recent data. However, if your durability requirements are not strict, you may still succeed in storing up to years of data in the local storage.
+Note that a limitation of the local storage is that it is not clustered or replicated. Thus, it is not arbitrarily scalable or durable in the face of disk or node outages and should be treated as you would any other kind of single node database. Using RAID for disk availability, [snapshots](https://prometheus.io/docs/prometheus/latest/querying/api/#snapshot) for backups, capacity planning, etc, is recommended for improved durability. With proper storage durability and planning storing years of data in the local storage is possible.
+
+Alternatively, external storage may be used via the [remote read/write APIs](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage). Careful evaluation is required for these systems as they vary greatly in durability, performance, and efficiency.
 
 For further details on file format, see [TSDB format](https://github.com/prometheus/prometheus/blob/master/tsdb/docs/format/README.md).
 
@@ -51,7 +53,7 @@ For further details on file format, see [TSDB format](https://github.com/prometh
 
 The initial two-hour blocks are eventually compacted into longer blocks in the background.
 
-Compaction will create larger blocks up to 10% of the rention time, or 21 days, whichever is smaller.
+Compaction will create larger blocks up to 10% of the retention time, or 31 days, whichever is smaller.
 
 ## Operational aspects
 
@@ -75,7 +77,7 @@ If your local storage becomes corrupted for whatever reason, your best bet is to
 
 If both time and size retention policies are specified, whichever policy triggers first will be used at that instant.
 
-Expired block cleanup happens on a background schedule. It may take up to two hours remove expired blocks. Expired blocks must be fully expired before they are cleaned up.
+Expired block cleanup happens on a background schedule. It may take up to two hours to remove expired blocks. Expired blocks must be fully expired before they are cleaned up.
 
 ## Remote storage integrations
 

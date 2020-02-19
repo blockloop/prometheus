@@ -28,6 +28,12 @@ import (
 	"github.com/prometheus/prometheus/util/strutil"
 )
 
+var (
+	ingressAddCount    = eventCount.WithLabelValues("ingress", "add")
+	ingressUpdateCount = eventCount.WithLabelValues("ingress", "update")
+	ingressDeleteCount = eventCount.WithLabelValues("ingress", "delete")
+)
+
 // Ingress implements discovery of Kubernetes ingress.
 type Ingress struct {
 	logger   log.Logger
@@ -41,15 +47,15 @@ func NewIngress(l log.Logger, inf cache.SharedInformer) *Ingress {
 	s := &Ingress{logger: l, informer: inf, store: inf.GetStore(), queue: workqueue.NewNamed("ingress")}
 	s.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
-			eventCount.WithLabelValues("ingress", "add").Inc()
+			ingressAddCount.Inc()
 			s.enqueue(o)
 		},
 		DeleteFunc: func(o interface{}) {
-			eventCount.WithLabelValues("ingress", "delete").Inc()
+			ingressDeleteCount.Inc()
 			s.enqueue(o)
 		},
 		UpdateFunc: func(_, o interface{}) {
-			eventCount.WithLabelValues("ingress", "update").Inc()
+			ingressUpdateCount.Inc()
 			s.enqueue(o)
 		},
 	})
@@ -70,7 +76,9 @@ func (i *Ingress) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 	defer i.queue.ShutDown()
 
 	if !cache.WaitForCacheSync(ctx.Done(), i.informer.HasSynced) {
-		level.Error(i.logger).Log("msg", "ingress informer unable to sync cache")
+		if ctx.Err() != context.Canceled {
+			level.Error(i.logger).Log("msg", "ingress informer unable to sync cache")
+		}
 		return
 	}
 
@@ -142,7 +150,8 @@ const (
 )
 
 func ingressLabels(ingress *v1beta1.Ingress) model.LabelSet {
-	ls := make(model.LabelSet, len(ingress.Labels)+len(ingress.Annotations)+2)
+	// Each label and annotation will create two key-value pairs in the map.
+	ls := make(model.LabelSet, 2*(len(ingress.Labels)+len(ingress.Annotations))+2)
 	ls[ingressNameLabel] = lv(ingress.Name)
 	ls[namespaceLabel] = lv(ingress.Namespace)
 

@@ -145,6 +145,9 @@ func resolveAndGlobFilepaths(baseDir string, utf *unitTestFile) error {
 		if err != nil {
 			return err
 		}
+		if len(m) <= 0 {
+			fmt.Fprintln(os.Stderr, "  WARNING: no file match pattern", rf)
+		}
 		globbedFiles = append(globbedFiles, m...)
 	}
 	utf.RuleFiles = globbedFiles
@@ -321,7 +324,7 @@ Outer:
 		got, err := query(suite.Context(), testCase.Expr, mint.Add(testCase.EvalTime),
 			suite.QueryEngine(), suite.Queryable())
 		if err != nil {
-			errs = append(errs, errors.Errorf("    expr:'%s', time:%s, err:%s", testCase.Expr,
+			errs = append(errs, errors.Errorf("    expr: %q, time: %s, err: %s", testCase.Expr,
 				testCase.EvalTime.String(), err.Error()))
 			continue
 		}
@@ -338,7 +341,8 @@ Outer:
 		for _, s := range testCase.ExpSamples {
 			lb, err := promql.ParseMetric(s.Labels)
 			if err != nil {
-				errs = append(errs, errors.Errorf("    expr:'%s', time:%s, err:%s", testCase.Expr,
+				err = errors.Wrapf(err, "labels %q", s.Labels)
+				errs = append(errs, errors.Errorf("    expr: %q, time: %s, err: %s", testCase.Expr,
 					testCase.EvalTime.String(), err.Error()))
 				continue Outer
 			}
@@ -355,7 +359,7 @@ Outer:
 			return labels.Compare(gotSamples[i].Labels, gotSamples[j].Labels) <= 0
 		})
 		if !reflect.DeepEqual(expSamples, gotSamples) {
-			errs = append(errs, errors.Errorf("    expr:'%s', time:%s, \n        exp:%#v, \n        got:%#v", testCase.Expr,
+			errs = append(errs, errors.Errorf("    expr: %q, time: %s,\n        exp:%#v\n        got:%#v", testCase.Expr,
 				testCase.EvalTime.String(), parsedSamplesString(expSamples), parsedSamplesString(gotSamples)))
 		}
 	}
@@ -510,7 +514,7 @@ func parsedSamplesString(pss []parsedSample) string {
 		return "nil"
 	}
 	s := pss[0].String()
-	for _, ps := range pss[0:] {
+	for _, ps := range pss[1:] {
 		s += ", " + ps.String()
 	}
 	return s

@@ -88,10 +88,13 @@ func ToQuery(from, to int64, matchers []*labels.Matcher, p *storage.SelectParams
 	var rp *prompb.ReadHints
 	if p != nil {
 		rp = &prompb.ReadHints{
-			StepMs:  p.Step,
-			Func:    p.Func,
-			StartMs: p.Start,
-			EndMs:   p.End,
+			StepMs:   p.Step,
+			Func:     p.Func,
+			StartMs:  p.Start,
+			EndMs:    p.End,
+			Grouping: p.Grouping,
+			By:       p.By,
+			RangeMs:  p.Range,
 		}
 	}
 
@@ -141,7 +144,7 @@ func ToQueryResult(ss storage.SeriesSet, sampleLimit int) (*prompb.QueryResult, 
 	return resp, nil
 }
 
-// FromQueryResult unpacks a QueryResult proto.
+// FromQueryResult unpacks and sorts a QueryResult proto.
 func FromQueryResult(res *prompb.QueryResult) storage.SeriesSet {
 	series := make([]storage.Series, 0, len(res.Timeseries))
 	for _, ts := range res.Timeseries {
@@ -218,7 +221,6 @@ func StreamChunkedReadResponses(
 			if len(chks) == 0 {
 				break
 			}
-
 			b, err := proto.Marshal(&prompb.ChunkedReadResponse{
 				ChunkedSeries: []*prompb.ChunkedSeries{
 					{
@@ -251,7 +253,7 @@ func StreamChunkedReadResponses(
 }
 
 // encodeChunks expects iterator to be ready to use (aka iter.Next() called before invoking).
-func encodeChunks(iter storage.SeriesIterator, chks []prompb.Chunk, frameBytesLeft int) ([]prompb.Chunk, error) {
+func encodeChunks(iter chunkenc.Iterator, chks []prompb.Chunk, frameBytesLeft int) ([]prompb.Chunk, error) {
 	const maxSamplesInChunk = 120
 
 	var (
@@ -389,7 +391,7 @@ func (c *concreteSeries) Labels() labels.Labels {
 	return labels.New(c.labels...)
 }
 
-func (c *concreteSeries) Iterator() storage.SeriesIterator {
+func (c *concreteSeries) Iterator() chunkenc.Iterator {
 	return newConcreteSeriersIterator(c)
 }
 
@@ -399,7 +401,7 @@ type concreteSeriesIterator struct {
 	series *concreteSeries
 }
 
-func newConcreteSeriersIterator(series *concreteSeries) storage.SeriesIterator {
+func newConcreteSeriersIterator(series *concreteSeries) chunkenc.Iterator {
 	return &concreteSeriesIterator{
 		cur:    -1,
 		series: series,

@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"reflect"
 	"sync"
 	"time"
 	"unsafe"
@@ -135,24 +136,27 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(targetIntervalLength)
-	prometheus.MustRegister(targetReloadIntervalLength)
-	prometheus.MustRegister(targetScrapePools)
-	prometheus.MustRegister(targetScrapePoolsFailed)
-	prometheus.MustRegister(targetScrapePoolReloads)
-	prometheus.MustRegister(targetScrapePoolReloadsFailed)
-	prometheus.MustRegister(targetSyncIntervalLength)
-	prometheus.MustRegister(targetScrapePoolSyncsCounter)
-	prometheus.MustRegister(targetScrapeSampleLimit)
-	prometheus.MustRegister(targetScrapeSampleDuplicate)
-	prometheus.MustRegister(targetScrapeSampleOutOfOrder)
-	prometheus.MustRegister(targetScrapeSampleOutOfBounds)
-	prometheus.MustRegister(targetScrapeCacheFlushForced)
+	prometheus.MustRegister(
+		targetIntervalLength,
+		targetReloadIntervalLength,
+		targetScrapePools,
+		targetScrapePoolsFailed,
+		targetScrapePoolReloads,
+		targetScrapePoolReloadsFailed,
+		targetSyncIntervalLength,
+		targetScrapePoolSyncsCounter,
+		targetScrapeSampleLimit,
+		targetScrapeSampleDuplicate,
+		targetScrapeSampleOutOfOrder,
+		targetScrapeSampleOutOfBounds,
+		targetScrapeCacheFlushForced,
+		targetMetadataCache,
+	)
 }
 
 // scrapePool manages scrapes for sets of targets.
 type scrapePool struct {
-	appendable Appendable
+	appendable storage.Appendable
 	logger     log.Logger
 
 	mtx    sync.RWMutex
@@ -176,13 +180,14 @@ type scrapeLoopOptions struct {
 	honorLabels     bool
 	honorTimestamps bool
 	mrc             []*relabel.Config
+	cache           *scrapeCache
 }
 
 const maxAheadTime = 10 * time.Minute
 
 type labelsMutator func(labels.Labels) labels.Labels
 
-func newScrapePool(cfg *config.ScrapeConfig, app Appendable, jitterSeed uint64, logger log.Logger) (*scrapePool, error) {
+func newScrapePool(cfg *config.ScrapeConfig, app storage.Appendable, jitterSeed uint64, logger log.Logger) (*scrapePool, error) {
 	targetScrapePools.Inc()
 	if logger == nil {
 		logger = log.NewNopLogger()
@@ -208,8 +213,11 @@ func newScrapePool(cfg *config.ScrapeConfig, app Appendable, jitterSeed uint64, 
 	}
 	sp.newLoop = func(opts scrapeLoopOptions) loop {
 		// Update the targets retrieval function for metadata to a new scrape cache.
-		cache := newScrapeCache()
-		opts.target.setMetadataStore(cache)
+		cache := opts.cache
+		if cache == nil {
+			cache = newScrapeCache()
+		}
+		opts.target.SetMetadataStore(cache)
 
 		return newScrapeLoop(
 			ctx,
@@ -220,13 +228,7 @@ func newScrapePool(cfg *config.ScrapeConfig, app Appendable, jitterSeed uint64, 
 				return mutateSampleLabels(l, opts.target, opts.honorLabels, opts.mrc)
 			},
 			func(l labels.Labels) labels.Labels { return mutateReportSampleLabels(l, opts.target) },
-			func() storage.Appender {
-				app, err := app.Appender()
-				if err != nil {
-					panic(err)
-				}
-				return appender(app, opts.limit)
-			},
+			func() storage.Appender { return appender(app.Appender(), opts.limit) },
 			cache,
 			jitterSeed,
 			opts.honorTimestamps,
@@ -291,6 +293,8 @@ func (sp *scrapePool) reload(cfg *config.ScrapeConfig) error {
 		targetScrapePoolReloadsFailed.Inc()
 		return errors.Wrap(err, "error creating HTTP client")
 	}
+
+	reuseCache := reusableCache(sp.config, cfg)
 	sp.config = cfg
 	oldClient := sp.client
 	sp.client = client
@@ -306,6 +310,12 @@ func (sp *scrapePool) reload(cfg *config.ScrapeConfig) error {
 	)
 
 	for fp, oldLoop := range sp.loops {
+		var cache *scrapeCache
+		if oc := oldLoop.getCache(); reuseCache && oc != nil {
+			cache = oc
+		} else {
+			cache = newScrapeCache()
+		}
 		var (
 			t       = sp.activeTargets[fp]
 			s       = &targetScraper{Target: t, client: sp.client, timeout: timeout}
@@ -316,6 +326,7 @@ func (sp *scrapePool) reload(cfg *config.ScrapeConfig) error {
 				honorLabels:     honorLabels,
 				honorTimestamps: honorTimestamps,
 				mrc:             mrc,
+				cache:           cache,
 			})
 		)
 		wg.Add(1)
@@ -451,9 +462,9 @@ func mutateSampleLabels(lset labels.Labels, target *Target, honor bool, rc []*re
 		for _, l := range target.Labels() {
 			// existingValue will be empty if l.Name doesn't exist.
 			existingValue := lset.Get(l.Name)
-			// Because setting a label with an empty value is a no-op,
-			// this will only create the prefixed label if necessary.
-			lb.Set(model.ExportedLabelPrefix+l.Name, existingValue)
+			if existingValue != "" {
+				lb.Set(model.ExportedLabelPrefix+l.Name, existingValue)
+			}
 			// It is now safe to set the target label.
 			lb.Set(l.Name, l.Value)
 		}
@@ -499,7 +510,7 @@ func appender(app storage.Appender, limit int) storage.Appender {
 // A scraper retrieves samples and accepts a status report at the end.
 type scraper interface {
 	scrape(ctx context.Context, w io.Writer) (string, error)
-	report(start time.Time, dur time.Duration, err error)
+	Report(start time.Time, dur time.Duration, err error)
 	offset(interval time.Duration, jitterSeed uint64) time.Duration
 }
 
@@ -579,6 +590,7 @@ func (s *targetScraper) scrape(ctx context.Context, w io.Writer) (string, error)
 type loop interface {
 	run(interval, timeout time.Duration, errc chan<- error)
 	stop()
+	getCache() *scrapeCache
 }
 
 type cacheEntry struct {
@@ -641,6 +653,11 @@ type metaEntry struct {
 	typ      textparse.MetricType
 	help     string
 	unit     string
+}
+
+func (m *metaEntry) size() int {
+	// The attribute lastIter although part of the struct it is not metadata.
+	return len(m.help) + len(m.unit) + len(m.typ)
 }
 
 func newScrapeCache() *scrapeCache {
@@ -794,7 +811,7 @@ func (c *scrapeCache) setUnit(metric, unit []byte) {
 	c.metaMtx.Unlock()
 }
 
-func (c *scrapeCache) getMetadata(metric string) (MetricMetadata, bool) {
+func (c *scrapeCache) GetMetadata(metric string) (MetricMetadata, bool) {
 	c.metaMtx.Lock()
 	defer c.metaMtx.Unlock()
 
@@ -810,7 +827,7 @@ func (c *scrapeCache) getMetadata(metric string) (MetricMetadata, bool) {
 	}, true
 }
 
-func (c *scrapeCache) listMetadata() []MetricMetadata {
+func (c *scrapeCache) ListMetadata() []MetricMetadata {
 	c.metaMtx.Lock()
 	defer c.metaMtx.Unlock()
 
@@ -825,6 +842,25 @@ func (c *scrapeCache) listMetadata() []MetricMetadata {
 		})
 	}
 	return res
+}
+
+// MetadataSize returns the size of the metadata cache.
+func (c *scrapeCache) SizeMetadata() (s int) {
+	c.metaMtx.Lock()
+	defer c.metaMtx.Unlock()
+	for _, e := range c.metadata {
+		s += e.size()
+	}
+
+	return s
+}
+
+// MetadataLen returns the number of metadata entries in the cache.
+func (c *scrapeCache) LengthMetadata() int {
+	c.metaMtx.Lock()
+	defer c.metaMtx.Unlock()
+
+	return len(c.metadata)
 }
 
 func newScrapeLoop(ctx context.Context,
@@ -1016,6 +1052,10 @@ func (sl *scrapeLoop) stop() {
 	<-sl.stopped
 }
 
+func (sl *scrapeLoop) getCache() *scrapeCache {
+	return sl.cache
+}
+
 func (sl *scrapeLoop) append(b []byte, contentType string, ts time.Time) (total, added, seriesAdded int, err error) {
 	var (
 		app            = sl.appender()
@@ -1066,7 +1106,7 @@ loop:
 		}
 		ce, ok := sl.cache.get(yoloString(met))
 		if ok {
-			switch err = app.AddFast(ce.lset, ce.ref, t, v); err {
+			switch err = app.AddFast(ce.ref, t, v); err {
 			case nil:
 				if tp == nil {
 					sl.cache.trackStaleness(ce.hash, ce.lset)
@@ -1212,7 +1252,7 @@ const (
 )
 
 func (sl *scrapeLoop) report(start time.Time, duration time.Duration, scraped, appended, seriesAdded int, err error) error {
-	sl.scraper.report(start, duration, err)
+	sl.scraper.Report(start, duration, err)
 
 	ts := timestamp.FromTime(start)
 
@@ -1277,7 +1317,7 @@ func (sl *scrapeLoop) reportStale(start time.Time) error {
 func (sl *scrapeLoop) addReportSample(app storage.Appender, s string, t int64, v float64) error {
 	ce, ok := sl.cache.get(s)
 	if ok {
-		err := app.AddFast(ce.lset, ce.ref, t, v)
+		err := app.AddFast(ce.ref, t, v)
 		switch err {
 		case nil:
 			return nil
@@ -1311,4 +1351,25 @@ func (sl *scrapeLoop) addReportSample(app storage.Appender, s string, t int64, v
 	default:
 		return err
 	}
+}
+
+// zeroConfig returns a new scrape config that only contains configuration items
+// that alter metrics.
+func zeroConfig(c *config.ScrapeConfig) *config.ScrapeConfig {
+	z := *c
+	// We zero out the fields that for sure don't affect scrape.
+	z.ScrapeInterval = 0
+	z.ScrapeTimeout = 0
+	z.SampleLimit = 0
+	z.HTTPClientConfig = config_util.HTTPClientConfig{}
+	return &z
+}
+
+// reusableCache compares two scrape config and tells wheter the cache is still
+// valid.
+func reusableCache(r, l *config.ScrapeConfig) bool {
+	if r == nil || l == nil {
+		return false
+	}
+	return reflect.DeepEqual(zeroConfig(r), zeroConfig(l))
 }

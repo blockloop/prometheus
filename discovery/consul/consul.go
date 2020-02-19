@@ -83,6 +83,10 @@ var (
 		[]string{"endpoint", "call"},
 	)
 
+	// Initialize metric vectors.
+	servicesRPCDuraion = rpcDuration.WithLabelValues("catalog", "services")
+	serviceRPCDuraion  = rpcDuration.WithLabelValues("catalog", "service")
+
 	// DefaultSDConfig is the default Consul SD configuration.
 	DefaultSDConfig = SDConfig{
 		TagSeparator:    ",",
@@ -141,10 +145,6 @@ func (c *SDConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 func init() {
 	prometheus.MustRegister(rpcFailuresCount)
 	prometheus.MustRegister(rpcDuration)
-
-	// Initialize metric vectors.
-	rpcDuration.WithLabelValues("catalog", "service")
-	rpcDuration.WithLabelValues("catalog", "services")
 }
 
 // Discovery retrieves target information from a Consul server
@@ -344,7 +344,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*targetgroup.Group) {
 // entire list of services.
 func (d *Discovery) watchServices(ctx context.Context, ch chan<- []*targetgroup.Group, lastIndex *uint64, services map[string]func()) {
 	catalog := d.client.Catalog()
-	level.Debug(d.logger).Log("msg", "Watching services", "tags", d.watchedTags)
+	level.Debug(d.logger).Log("msg", "Watching services", "tags", strings.Join(d.watchedTags, ","))
 
 	t0 := time.Now()
 	opts := &consul.QueryOptions{
@@ -355,7 +355,14 @@ func (d *Discovery) watchServices(ctx context.Context, ch chan<- []*targetgroup.
 	}
 	srvs, meta, err := catalog.Services(opts.WithContext(ctx))
 	elapsed := time.Since(t0)
-	rpcDuration.WithLabelValues("catalog", "services").Observe(elapsed.Seconds())
+	servicesRPCDuraion.Observe(elapsed.Seconds())
+
+	// Check the context before in order to exit early.
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
 
 	if err != nil {
 		level.Error(d.logger).Log("msg", "Error refreshing service list", "err", err)
@@ -452,7 +459,7 @@ func (d *Discovery) watchService(ctx context.Context, ch chan<- []*targetgroup.G
 
 // Get updates for a service.
 func (srv *consulService) watch(ctx context.Context, ch chan<- []*targetgroup.Group, catalog *consul.Catalog, lastIndex *uint64) {
-	level.Debug(srv.logger).Log("msg", "Watching service", "service", srv.name, "tags", srv.tags)
+	level.Debug(srv.logger).Log("msg", "Watching service", "service", srv.name, "tags", strings.Join(srv.tags, ","))
 
 	t0 := time.Now()
 	opts := &consul.QueryOptions{
@@ -463,7 +470,7 @@ func (srv *consulService) watch(ctx context.Context, ch chan<- []*targetgroup.Gr
 	}
 	nodes, meta, err := catalog.ServiceMultipleTags(srv.name, srv.tags, opts.WithContext(ctx))
 	elapsed := time.Since(t0)
-	rpcDuration.WithLabelValues("catalog", "service").Observe(elapsed.Seconds())
+	serviceRPCDuraion.Observe(elapsed.Seconds())
 
 	// Check the context before in order to exit early.
 	select {
@@ -474,7 +481,7 @@ func (srv *consulService) watch(ctx context.Context, ch chan<- []*targetgroup.Gr
 	}
 
 	if err != nil {
-		level.Error(srv.logger).Log("msg", "Error refreshing service", "service", srv.name, "tags", srv.tags, "err", err)
+		level.Error(srv.logger).Log("msg", "Error refreshing service", "service", srv.name, "tags", strings.Join(srv.tags, ","), "err", err)
 		rpcFailuresCount.Inc()
 		time.Sleep(retryInterval)
 		return

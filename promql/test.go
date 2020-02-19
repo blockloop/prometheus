@@ -102,8 +102,8 @@ func (t *Test) Storage() storage.Storage {
 
 func raise(line int, format string, v ...interface{}) error {
 	return &ParseErr{
-		Line: line + 1,
-		Err:  errors.Errorf(format, v...),
+		lineOffset: line,
+		Err:        errors.Errorf(format, v...),
 	}
 }
 
@@ -128,7 +128,7 @@ func parseLoad(lines []string, i int) (int, *loadCmd, error) {
 		metric, vals, err := parseSeriesDesc(defLine)
 		if err != nil {
 			if perr, ok := err.(*ParseErr); ok {
-				perr.Line = i + 1
+				perr.lineOffset = i
 			}
 			return i, nil, err
 		}
@@ -150,8 +150,11 @@ func (t *Test) parseEval(lines []string, i int) (int, *evalCmd, error) {
 	_, err := ParseExpr(expr)
 	if err != nil {
 		if perr, ok := err.(*ParseErr); ok {
-			perr.Line = i + 1
-			perr.Pos += strings.Index(lines[i], expr)
+			perr.lineOffset = i
+			posOffset := Pos(strings.Index(lines[i], expr))
+			perr.PositionRange.Start += posOffset
+			perr.PositionRange.End += posOffset
+			perr.Query = lines[i]
 		}
 		return i, nil, err
 	}
@@ -184,7 +187,7 @@ func (t *Test) parseEval(lines []string, i int) (int, *evalCmd, error) {
 		metric, vals, err := parseSeriesDesc(defLine)
 		if err != nil {
 			if perr, ok := err.(*ParseErr); ok {
-				perr.Line = i + 1
+				perr.lineOffset = i
 			}
 			return i, nil, err
 		}
@@ -408,10 +411,9 @@ func (cmd clearCmd) String() string {
 // is reached, evaluation errors do not terminate execution.
 func (t *Test) Run() error {
 	for _, cmd := range t.cmds {
-		err := t.exec(cmd)
 		// TODO(fabxc): aggregate command errors, yield diffs for result
 		// comparison errors.
-		if err != nil {
+		if err := t.exec(cmd); err != nil {
 			return err
 		}
 	}
@@ -425,10 +427,7 @@ func (t *Test) exec(tc testCommand) error {
 		t.clear()
 
 	case *loadCmd:
-		app, err := t.storage.Appender()
-		if err != nil {
-			return err
-		}
+		app := t.storage.Appender()
 		if err := cmd.append(app); err != nil {
 			app.Rollback()
 			return err
@@ -443,6 +442,7 @@ func (t *Test) exec(tc testCommand) error {
 		if err != nil {
 			return err
 		}
+		defer q.Close()
 		res := q.Exec(t.context)
 		if res.Err != nil {
 			if cmd.fail {
@@ -450,7 +450,6 @@ func (t *Test) exec(tc testCommand) error {
 			}
 			return errors.Wrapf(res.Err, "error evaluating query %q (line %d)", cmd.expr, cmd.line)
 		}
-		defer q.Close()
 		if res.Err == nil && cmd.fail {
 			return errors.Errorf("expected error evaluating query %q (line %d) but got none", cmd.expr, cmd.line)
 		}
@@ -461,7 +460,7 @@ func (t *Test) exec(tc testCommand) error {
 		}
 
 		// Check query returns same result in range mode,
-		/// by checking against the middle step.
+		// by checking against the middle step.
 		q, err = t.queryEngine.NewRangeQuery(t.storage, cmd.expr, cmd.start.Add(-time.Minute), cmd.start.Add(time.Minute), time.Minute)
 		if err != nil {
 			return err
@@ -513,11 +512,10 @@ func (t *Test) clear() {
 	t.storage = teststorage.New(t)
 
 	opts := EngineOpts{
-		Logger:        nil,
-		Reg:           nil,
-		MaxConcurrent: 20,
-		MaxSamples:    10000,
-		Timeout:       100 * time.Second,
+		Logger:     nil,
+		Reg:        nil,
+		MaxSamples: 10000,
+		Timeout:    100 * time.Second,
 	}
 
 	t.queryEngine = NewEngine(opts)
@@ -627,11 +625,10 @@ func (ll *LazyLoader) clear() {
 	ll.storage = teststorage.New(ll)
 
 	opts := EngineOpts{
-		Logger:        nil,
-		Reg:           nil,
-		MaxConcurrent: 20,
-		MaxSamples:    10000,
-		Timeout:       100 * time.Second,
+		Logger:     nil,
+		Reg:        nil,
+		MaxSamples: 10000,
+		Timeout:    100 * time.Second,
 	}
 
 	ll.queryEngine = NewEngine(opts)
@@ -640,10 +637,7 @@ func (ll *LazyLoader) clear() {
 
 // appendTill appends the defined time series to the storage till the given timestamp (in milliseconds).
 func (ll *LazyLoader) appendTill(ts int64) error {
-	app, err := ll.storage.Appender()
-	if err != nil {
-		return err
-	}
+	app := ll.storage.Appender()
 	for h, smpls := range ll.loadCmd.defs {
 		m := ll.loadCmd.metrics[h]
 		for i, s := range smpls {

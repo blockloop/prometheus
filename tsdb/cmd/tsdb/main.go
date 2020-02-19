@@ -15,6 +15,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,11 +33,11 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/pkg/errors"
+	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/tsdb"
 	"github.com/prometheus/prometheus/tsdb/chunks"
 	tsdb_errors "github.com/prometheus/prometheus/tsdb/errors"
-	"github.com/prometheus/prometheus/tsdb/labels"
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 func main() {
@@ -176,8 +177,8 @@ func (b *writeBenchmark) run() error {
 	l := log.With(b.logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
 
 	st, err := tsdb.Open(dir, l, nil, &tsdb.Options{
-		RetentionDuration: 15 * 24 * 60 * 60 * 1000, // 15 days in milliseconds
-		BlockRanges:       tsdb.ExponentialBlockRanges(2*60*60*1000, 5, 3),
+		RetentionDuration: int64(15 * 24 * time.Hour / time.Millisecond),
+		MinBlockDuration:  int64(2 * time.Hour / time.Millisecond),
 	})
 	if err != nil {
 		return err
@@ -559,17 +560,9 @@ func analyzeBlock(b tsdb.BlockReader, limit int) error {
 			return err
 		}
 		var cumulativeLength uint64
-
-		for i := 0; i < values.Len(); i++ {
-			value, err := values.At(i)
-			if err != nil {
-				return err
-			}
-			for _, str := range value {
-				cumulativeLength += uint64(len(str))
-			}
+		for _, str := range values {
+			cumulativeLength += uint64(len(str))
 		}
-
 		postingInfos = append(postingInfos, postingInfo{n, cumulativeLength})
 	}
 
@@ -582,7 +575,7 @@ func analyzeBlock(b tsdb.BlockReader, limit int) error {
 		if err != nil {
 			return err
 		}
-		postingInfos = append(postingInfos, postingInfo{n, uint64(lv.Len())})
+		postingInfos = append(postingInfos, postingInfo{n, uint64(len(lv))})
 	}
 	fmt.Printf("\nHighest cardinality labels:\n")
 	printInfo(postingInfos)
@@ -592,25 +585,19 @@ func analyzeBlock(b tsdb.BlockReader, limit int) error {
 	if err != nil {
 		return err
 	}
-	for i := 0; i < lv.Len(); i++ {
-		names, err := lv.At(i)
+	for _, n := range lv {
+		postings, err := ir.Postings("__name__", n)
 		if err != nil {
 			return err
 		}
-		for _, n := range names {
-			postings, err := ir.Postings("__name__", n)
-			if err != nil {
-				return err
-			}
-			count := 0
-			for postings.Next() {
-				count++
-			}
-			if postings.Err() != nil {
-				return postings.Err()
-			}
-			postingInfos = append(postingInfos, postingInfo{n, uint64(count)})
+		count := 0
+		for postings.Next() {
+			count++
 		}
+		if postings.Err() != nil {
+			return postings.Err()
+		}
+		postingInfos = append(postingInfos, postingInfo{n, uint64(count)})
 	}
 	fmt.Printf("\nHighest cardinality metric names:\n")
 	printInfo(postingInfos)
@@ -618,8 +605,7 @@ func analyzeBlock(b tsdb.BlockReader, limit int) error {
 }
 
 func dumpSamples(db *tsdb.DBReadOnly, mint, maxt int64) (err error) {
-
-	q, err := db.Querier(mint, maxt)
+	q, err := db.Querier(context.TODO(), mint, maxt)
 	if err != nil {
 		return err
 	}
@@ -630,9 +616,17 @@ func dumpSamples(db *tsdb.DBReadOnly, mint, maxt int64) (err error) {
 		err = merr.Err()
 	}()
 
-	ss, err := q.Select(labels.NewMustRegexpMatcher("", ".*"))
+	ss, ws, err := q.Select(nil, labels.MustNewMatcher(labels.MatchRegexp, "", ".*"))
 	if err != nil {
 		return err
+	}
+
+	if len(ws) > 0 {
+		var merr tsdb_errors.MultiError
+		for _, w := range ws {
+			merr.Add(w)
+		}
+		return merr.Err()
 	}
 
 	for ss.Next() {
