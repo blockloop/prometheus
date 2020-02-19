@@ -545,6 +545,7 @@ func (h *Handler) Run(ctx context.Context) error {
 		h.options.LocalStorage,
 		h.options.TSDBDir,
 		h.options.EnableAdminAPI,
+		h.logger,
 	)
 	av2.RegisterGRPC(grpcSrv)
 

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,8 +29,11 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
+	"google.golang.org/grpc"
+
 	"github.com/prometheus/prometheus/notifier"
 	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/rules"
 	"github.com/prometheus/prometheus/util/testutil"
 )
@@ -303,4 +307,60 @@ func getCurrentGaugeValuesFor(t *testing.T, reg prometheus.Gatherer, metricNames
 		}
 	}
 	return res
+}
+
+func TestStreamRemoteWrites(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	prom := exec.Command(promPath, "--config.file="+promConfig, "--storage.tsdb.path="+promData, "--web.enable-admin-api")
+	err := prom.Start()
+	if err != nil {
+		t.Errorf("execution error: %v", err)
+		return
+	}
+	defer prom.Process.Kill()
+
+	// Create grpc admin client
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, "localhost:9090", grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		t.Fatalf("failed to create grpc client connection: %v", err)
+	}
+
+	client := prompb.NewAdminClient(conn)
+
+	stream, err := client.RemoteWrite(context.Background())
+	if err != nil {
+		t.Fatalf("failed to create RemoteWrite stream: %v", err)
+	}
+	defer stream.CloseSend()
+
+	// Stream some data into prometheus
+	if err := stream.Send(&prompb.WriteRequest{
+		Timeseries: []prompb.TimeSeries{
+			{
+				Labels: []prompb.Label{
+					{
+						Name:  "__name__",
+						Value: "my_metric",
+					},
+					{
+						Name:  "test_label",
+						Value: "test_stream",
+					},
+				},
+				Samples: []prompb.Sample{
+					{
+						Value:     100 * rand.Float64(),
+						Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
+					},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("failed to RemoteWrite data: %v", err)
+	}
 }
