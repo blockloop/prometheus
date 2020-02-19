@@ -577,6 +577,7 @@ func (h *Handler) Run(ctx context.Context, listener net.Listener, webConfig stri
 		h.options.LocalStorage,
 		h.options.TSDBDir,
 		h.options.EnableAdminAPI,
+		h.logger,
 	)
 	av2.RegisterGRPC(grpcSrv)
 
